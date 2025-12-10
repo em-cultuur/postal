@@ -52,7 +52,9 @@ module SMTPClient
     #
     # @return [Net::SMTP]
     def start_smtp_session(source_ip_address: nil, allow_ssl: true)
+
       @smtp_client = Net::SMTP.new(@ip_address, @server.port)
+      @smtp_client.set_debug_output($stderr) if Postal::Config.smtp.debug_mode
       @smtp_client.open_timeout = Postal::Config.smtp_client.open_timeout
       @smtp_client.read_timeout = Postal::Config.smtp_client.read_timeout
       @smtp_client.tls_hostname = @server.hostname
@@ -98,6 +100,9 @@ module SMTPClient
     #
     # @return [void]
     def send_message(raw_message, mail_from, rcpt_to, retry_on_connection_error: true)
+
+      logger.info "Sending message to #{rcpt_to} smtp_client.nil: #{@smtp_client.nil?}" # smtp_client started?: #{@smtp_client.started?}"
+
       raise SMTPSessionNotStartedError if @smtp_client.nil? || (@smtp_client && !@smtp_client.started?)
 
       @smtp_client.rset_errors
@@ -131,6 +136,10 @@ module SMTPClient
       nil
     ensure
       @smtp_client = nil
+    end
+
+    def logger
+      @logger ||= Postal.logger.create_tagged_logger(log_id: @log_id)
     end
 
     class << self

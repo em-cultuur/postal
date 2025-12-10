@@ -185,6 +185,9 @@ class SMTPSender < BaseSender
     # Add this endpoint to the list of endpoints that we have attempted to connect to
     @endpoints << endpoint unless @endpoints.include?(endpoint)
 
+    logger.info "SMTP connect to: #{endpoint.to_s}"
+    logger.info "SMTP HELO/EHLO: #{@source_ip_address ? @source_ip_address.hostname : endpoint.class.default_helo_hostname}"
+
     endpoint.start_smtp_session(allow_ssl: allow_ssl, source_ip_address: @source_ip_address)
     logger.info "Connected to #{endpoint}"
     @current_endpoint = endpoint
@@ -203,7 +206,7 @@ class SMTPSender < BaseSender
     end
 
     # Otherwise, just log the connection error and return false
-    logger.error "Cannot connect to #{endpoint} (#{e.class}: #{e.message})"
+    logger.error "Cannot connect to #{endpoint} (#{e.class}: #{e.message}) from #{@source_ip_address.nil? ? 'default IP': @source_ip_address.ipv4}"
     @connection_errors << e.message unless @connection_errors.include?(e.message)
 
     false
