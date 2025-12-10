@@ -1,0 +1,42 @@
+- page_title << @server.name
+- page_title << "Messages"
+- page_title << "Throttled Domains"
+= render 'servers/sidebar', :active_server => @server
+= render 'servers/header', :active_nav => :messages
+= render 'header', :active_nav => :throttled_domains
+.pageContent.pageContent--compact
+  - if @throttled_domains.empty?
+    .noData.noData--clean
+      %h2.noData__title No domains are currently throttled.
+      %p.noData__text
+        When a remote mail server responds with a rate limiting error (451), the domain is temporarily
+        throttled to avoid further issues. Active throttles will appear here.
+  - else
+    %p.pageContent__intro.u-margin
+      These domains are currently throttled due to rate limiting responses from their mail servers.
+      Messages to these domains will be held until the throttle expires.
+    %ul.throttleList
+      - @throttled_domains.each do |throttle|
+        %li.throttleList__item
+          .throttleList__left
+            %p.throttleList__domain= throttle.domain
+            %p.throttleList__reason= throttle.reason.present? ? throttle.reason.truncate(100) : "Rate limit exceeded"
+          .throttleList__right
+            %p.throttleList__timestamp
+              Expires #{throttle.throttled_until.to_fs(:long)}
+            %p.throttleList__remaining
+              - remaining = throttle.remaining_seconds
+              - if remaining > 3600
+                %span.label.label--warning= "#{(remaining / 3600).floor}h #{((remaining % 3600) / 60).floor}m remaining"
+              - elsif remaining > 60
+                %span.label.label--warning= "#{(remaining / 60).floor}m #{(remaining % 60).floor}s remaining"
+              - else
+                %span.label.label--positive= "#{remaining}s remaining"
+          .throttleList__actions
+            = link_to "Remove", throttled_domain_organization_server_messages_path(organization, @server, throttle), method: :delete, class: "button button--tiny button--danger", data: { confirm: "Are you sure you want to remove this throttle? Messages to #{throttle.domain} will be sent immediately." }
+
+    %p.u-margin.u-muted
+      %small
+        Throttled domains are automatically removed when the throttle expires.
+        You can manually remove a throttle if you believe the issue has been resolved.
+

@@ -10,6 +10,7 @@ module MessageDequeuer
         add_tag
         hold_if_credential_is_set_to_hold
         hold_if_recipient_on_suppression_list
+        skip_if_domain_throttled
         parse_content
         inspect_message
         fail_if_spam
@@ -18,6 +19,7 @@ module MessageDequeuer
         increment_live_stats
         hold_if_server_development_mode
         send_message_to_sender
+        apply_domain_throttle_if_required
         add_recipient_to_suppression_list_on_too_many_hard_fails
         remove_recipient_from_suppression_list_on_success
         log_sender_result
@@ -73,6 +75,25 @@ module MessageDequeuer
       log "recipient is on the suppression list, holding"
       create_delivery "Held", details: "Recipient (#{queued_message.message.rcpt_to}) is on the suppression list (reason: #{sl['reason']})"
       remove_from_queue
+      stop_processing
+    end
+
+    def skip_if_domain_throttled
+      return if queued_message.manual?
+
+      domain = queued_message.message.recipient_domain
+      return unless domain
+
+      throttle = DomainThrottle.throttled?(queued_message.server, domain)
+      return unless throttle
+
+      # Requeue the message to retry after the throttle expires
+      retry_seconds = throttle.remaining_seconds + 10
+      queued_message.retry_later(retry_seconds)
+      log "domain #{domain} is throttled, requeuing for later",
+          throttled_until: throttle.throttled_until,
+          retry_after: queued_message.retry_after,
+          reason: throttle.reason
       stop_processing
     end
 
@@ -158,6 +179,51 @@ module MessageDequeuer
       return unless @result.connect_error
 
       @state.send_result = @result
+    end
+
+    def apply_domain_throttle_if_required
+      return unless @result
+      return unless @result.domain_throttle_required
+
+      domain = queued_message.message.recipient_domain
+      return unless domain
+
+      duration = @result.domain_throttle_duration || DomainThrottle::DEFAULT_THROTTLE_DURATION
+      reason = @result.output.to_s.truncate(255)
+
+      # Create or update the throttle for this domain
+      throttle = DomainThrottle.apply(
+        queued_message.server,
+        domain,
+        duration: duration,
+        reason: reason
+      )
+
+      log "applied domain throttle",
+          domain: domain,
+          duration: duration,
+          throttled_until: throttle.throttled_until,
+          reason: reason
+
+      # Update retry_after for all queued messages to the same domain on this server
+      # This prevents other workers from attempting to send to the throttled domain
+      throttle_all_queued_messages_for_domain(domain, throttle.throttled_until)
+    end
+
+    def throttle_all_queued_messages_for_domain(domain, throttled_until)
+      retry_after = throttled_until + 10.seconds
+
+      # Update all queued messages for this domain that don't already have a later retry_after
+      updated_count = QueuedMessage.where(server_id: queued_message.server_id, domain: domain)
+                                   .where("retry_after IS NULL OR retry_after < ?", retry_after)
+                                   .where.not(id: queued_message.id)
+                                   .update_all(retry_after: retry_after)
+
+      if updated_count > 0
+        log "throttled #{updated_count} additional queued messages for domain",
+            domain: domain,
+            retry_after: retry_after
+      end
     end
 
     def add_recipient_to_suppression_list_on_too_many_hard_fails

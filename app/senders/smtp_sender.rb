@@ -107,6 +107,13 @@ class SMTPSender < BaseSender
       else
         r.retry = true
       end
+
+      # Check for rate limiting responses (451 too many messages, slow down, etc.)
+      if requires_domain_throttle?(e.message)
+        r.domain_throttle_required = true
+        r.domain_throttle_duration = extract_throttle_duration(e.message)
+        logger.info "Domain throttling required: #{r.domain_throttle_duration} seconds"
+      end
     end
   rescue Net::SMTPFatalError => e
     logger.error "#{e.class}: #{e.message}"
@@ -234,6 +241,46 @@ class SMTPSender < BaseSender
 
   def logger
     @logger ||= Postal.logger.create_tagged_logger(log_id: @log_id)
+  end
+
+  # Check if the error message indicates that domain-level throttling is required
+  #
+  # @param message [String] the SMTP error message
+  # @return [Boolean]
+  def requires_domain_throttle?(message)
+    return false if message.blank?
+
+    # Match common patterns for rate limiting responses
+    # 451 is the standard code for "try again later"
+    throttle_patterns = [
+      /\b451\b.*\b(too many|rate limit|slow down|try again later|temporarily deferred)/i,
+      /\b(too many messages|too many connections|rate limit|sending rate|slow down)\b/i,
+      /\b(temporarily rejected|temporarily deferred|try again later)\b.*\b(rate|limit|too many)/i
+    ]
+
+    throttle_patterns.any? { |pattern| message.match?(pattern) }
+  end
+
+  # Extract throttle duration from SMTP error message
+  #
+  # @param message [String] the SMTP error message
+  # @return [Integer] duration in seconds (default: 300 = 5 minutes)
+  def extract_throttle_duration(message)
+    default_duration = DomainThrottle::DEFAULT_THROTTLE_DURATION
+
+    return default_duration if message.blank?
+
+    # Try to extract a specific time from the message
+    if message =~ /(\d+)\s*seconds?/i
+      return [::Regexp.last_match(1).to_i + 10, default_duration].max
+    elsif message =~ /(\d+)\s*minutes?/i
+      return [(::Regexp.last_match(1).to_i * 60) + 10, default_duration].max
+    elsif message =~ /(\d+)\s*hours?/i
+      # Cap at max throttle duration for very long delays
+      return [::Regexp.last_match(1).to_i * 3600, DomainThrottle::MAX_THROTTLE_DURATION].min
+    end
+
+    default_duration
   end
 
   class << self

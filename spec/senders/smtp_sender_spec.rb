@@ -499,6 +499,109 @@ RSpec.describe SMTPSender do
           expect(sender.endpoints.last).to have_received(:reset_smtp_session)
         end
       end
+
+      context "when the SMTP server returns a 451 rate limit error" do
+        let(:smtp_send_message_error) { proc { Net::SMTPServerBusy.new("451 4.7.1 Too many messages, slow down") } }
+
+        it "returns a SoftFail with domain throttle required" do
+          result = sender.send_message(message)
+          expect(result).to be_a SendResult
+          expect(result).to have_attributes(
+            type: "SoftFail",
+            domain_throttle_required: true
+          )
+          expect(result.domain_throttle_duration).to be_a(Integer)
+          expect(result.domain_throttle_duration).to be >= DomainThrottle::DEFAULT_THROTTLE_DURATION
+        end
+      end
+
+      context "when the SMTP server returns a rate limit error with seconds" do
+        let(:smtp_send_message_error) { proc { Net::SMTPServerBusy.new("451 Too many messages, try again in 120 seconds") } }
+
+        it "extracts the throttle duration from the message" do
+          result = sender.send_message(message)
+          expect(result).to have_attributes(
+            domain_throttle_required: true,
+            domain_throttle_duration: 300  # max of (120 + 10) and DEFAULT_THROTTLE_DURATION (300)
+          )
+        end
+      end
+
+      context "when the SMTP server returns a rate limit error with minutes" do
+        let(:smtp_send_message_error) { proc { Net::SMTPServerBusy.new("451 Rate limit exceeded, retry in 10 minutes") } }
+
+        it "extracts the throttle duration from the message" do
+          result = sender.send_message(message)
+          expect(result).to have_attributes(
+            domain_throttle_required: true,
+            domain_throttle_duration: 610  # (10 * 60) + 10
+          )
+        end
+      end
+
+      context "when the SMTP server returns a non-rate-limit error" do
+        let(:smtp_send_message_error) { proc { Net::SMTPServerBusy.new("450 Mailbox temporarily unavailable") } }
+
+        it "does not require domain throttle" do
+          result = sender.send_message(message)
+          expect(result).to have_attributes(
+            type: "SoftFail",
+            domain_throttle_required: nil
+          )
+        end
+      end
+    end
+  end
+
+  describe "#requires_domain_throttle?" do
+    it "returns true for 451 too many messages" do
+      expect(sender.send(:requires_domain_throttle?, "451 4.7.1 Too many messages")).to be true
+    end
+
+    it "returns true for slow down messages" do
+      expect(sender.send(:requires_domain_throttle?, "451 slow down")).to be true
+    end
+
+    it "returns true for rate limit messages" do
+      expect(sender.send(:requires_domain_throttle?, "Rate limit exceeded, please try again later")).to be true
+    end
+
+    it "returns true for too many connections" do
+      expect(sender.send(:requires_domain_throttle?, "Too many connections from your IP")).to be true
+    end
+
+    it "returns false for generic errors" do
+      expect(sender.send(:requires_domain_throttle?, "450 Mailbox temporarily unavailable")).to be false
+    end
+
+    it "returns false for nil messages" do
+      expect(sender.send(:requires_domain_throttle?, nil)).to be false
+    end
+
+    it "returns false for empty messages" do
+      expect(sender.send(:requires_domain_throttle?, "")).to be false
+    end
+  end
+
+  describe "#extract_throttle_duration" do
+    it "extracts duration from seconds format" do
+      expect(sender.send(:extract_throttle_duration, "Try again in 60 seconds")).to eq(300) # min of 60+10 and 300
+    end
+
+    it "extracts duration from minutes format" do
+      expect(sender.send(:extract_throttle_duration, "Retry in 10 minutes")).to eq(610)
+    end
+
+    it "returns default duration for messages without time" do
+      expect(sender.send(:extract_throttle_duration, "Too many messages")).to eq(DomainThrottle::DEFAULT_THROTTLE_DURATION)
+    end
+
+    it "returns default duration for nil messages" do
+      expect(sender.send(:extract_throttle_duration, nil)).to eq(DomainThrottle::DEFAULT_THROTTLE_DURATION)
+    end
+
+    it "caps hours at MAX_THROTTLE_DURATION" do
+      expect(sender.send(:extract_throttle_duration, "Try again in 2 hours")).to eq(DomainThrottle::MAX_THROTTLE_DURATION)
     end
   end
 
