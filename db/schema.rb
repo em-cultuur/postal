@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_11_09_101656) do
+ActiveRecord::Schema[7.1].define(version: 20251210000001) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -72,6 +72,17 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_09_101656) do
     t.datetime "updated_at"
     t.boolean "hold", default: false
     t.string "uuid"
+  end
+
+  create_table "domain_throttles", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
+    t.integer "server_id", null: false
+    t.string "domain", null: false
+    t.datetime "throttled_until", null: false
+    t.string "reason"
+    t.datetime "created_at", precision: nil
+    t.datetime "updated_at", precision: nil
+    t.index ["server_id", "domain"], name: "index_domain_throttles_on_server_id_and_domain", unique: true
+    t.index ["throttled_until"], name: "index_domain_throttles_on_throttled_until"
   end
 
   create_table "domains", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
