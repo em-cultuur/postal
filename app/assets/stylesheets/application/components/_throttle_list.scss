@@ -1,0 +1,54 @@
+.throttleList {
+  border-radius:4px;
+  overflow:hidden;
+  box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+
+.throttleList__item {
+  background:#fff;
+  padding:15px;
+  display:flex;
+  align-items: center;
+}
+.throttleList__item:nth-child(even) {
+  background:none;
+}
+
+.throttleList__item + .throttleList__item {
+  border-top:1px solid lighten(#ccd4e0, 10%);
+}
+
+.throttleList__left {
+  flex: 1 1 auto;
+}
+
+.throttleList__right {
+  flex: 0 0 auto;
+  text-align: right;
+  margin-right: 20px;
+}
+
+.throttleList__actions {
+  flex: 0 0 auto;
+}
+
+.throttleList__domain {
+  font-weight:600;
+  margin-bottom:5px;
+  font-size: 14px;
+}
+
+.throttleList__reason {
+  color:#999;
+  font-size: 12px;
+}
+
+.throttleList__timestamp {
+  color:#999;
+  font-size:12px;
+}
+
+.throttleList__remaining {
+  margin-top: 5px;
+}
+

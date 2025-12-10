@@ -147,6 +147,23 @@ class MessagesController < ApplicationController
     @suppressions = @server.message_db.suppression_list.all_with_pagination(params[:page])
   end
 
+  def throttled_domains
+    @throttled_domains = @server.domain_throttles.active.order(throttled_until: :asc)
+  end
+
+  def remove_throttled_domain
+    throttle = @server.domain_throttles.find_by(id: params[:id])
+    if throttle
+      domain = throttle.domain
+      throttle.destroy
+      redirect_to throttled_domains_organization_server_messages_path(organization, @server),
+                  notice: "Throttle for #{domain} has been removed."
+    else
+      redirect_to throttled_domains_organization_server_messages_path(organization, @server),
+                  alert: "Throttle not found."
+    end
+  end
+
   def activity
     @entries = @message.activity_entries
   end
