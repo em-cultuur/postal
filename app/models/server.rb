@@ -63,6 +63,7 @@ class Server < ApplicationRecord
   has_many :address_endpoints, dependent: :destroy
   has_many :routes, dependent: :destroy
   has_many :queued_messages, dependent: :delete_all
+  has_many :domain_throttles, dependent: :delete_all
   has_many :webhooks, dependent: :destroy
   has_many :webhook_requests, dependent: :destroy
   has_many :track_domains, dependent: :destroy

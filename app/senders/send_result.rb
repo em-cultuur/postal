@@ -11,6 +11,8 @@ class SendResult
   attr_accessor :log_id
   attr_accessor :time
   attr_accessor :suppress_bounce
+  attr_accessor :domain_throttle_required
+  attr_accessor :domain_throttle_duration
 
   def initialize
     @details = ""
