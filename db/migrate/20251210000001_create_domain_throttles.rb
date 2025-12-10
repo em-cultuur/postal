@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-class CreateDomainThrottles < ActiveRecord::Migration[7.0]
-
+class CreateDomainThrottles < ActiveRecord::Migration[7.1]
   def change
     create_table :domain_throttles, id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci" do |t|
       t.integer :server_id, null: false
