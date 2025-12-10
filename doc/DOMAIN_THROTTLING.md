@@ -259,6 +259,63 @@ DomainThrottle.group(:domain)
 | `app/senders/smtp_sender.rb` | Rilevamento errori 451 |
 | `app/lib/message_dequeuer/outgoing_message_processor.rb` | Logica di throttling |
 | `app/scheduled_tasks/prune_domain_throttles_scheduled_task.rb` | Pulizia periodica |
+| `app/controllers/messages_controller.rb` | Actions per UI (`throttled_domains`, `remove_throttled_domain`) |
+| `app/views/messages/throttled_domains.html.haml` | Vista lista domini in throttle |
+| `app/views/messages/_header.html.haml` | Link nel menu di navigazione |
+| `config/routes.rb` | Routes per le nuove pagine |
+
+## Interfaccia Web
+
+### Accesso
+
+La pagina "Throttled Domains" è accessibile dalla sezione **Messages** di ogni server:
+
+```
+Organization → Server → Messages → Throttled Domains
+```
+
+### Funzionalità
+
+La pagina mostra una tabella con:
+
+| Colonna | Descrizione |
+|---------|-------------|
+| **Domain** | Il dominio destinatario in throttle |
+| **Throttled Until** | Data e ora di scadenza del throttle |
+| **Time Remaining** | Tempo rimanente in formato leggibile (es. "4m 30s") |
+| **Reason** | Il messaggio di errore originale del server SMTP |
+| **Actions** | Pulsante per rimuovere manualmente il throttle |
+
+### Rimozione Manuale
+
+È possibile rimuovere un throttle manualmente cliccando il pulsante "Remove". Questo è utile quando:
+
+- Il problema sul server remoto è stato risolto
+- Si vuole forzare un nuovo tentativo di invio
+- Il throttle è stato applicato erroneamente
+
+**Attenzione:** Rimuovere un throttle farà sì che i messaggi in coda vengano inviati immediatamente. Se il server remoto sta ancora limitando il rate, potrebbe risultare in ulteriori errori 451.
+
+### Screenshot Concettuale
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Messages │ Outgoing │ Incoming │ Queue │ Held │ Send │ Suppressions │ [Throttled] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Throttled Domains                                                          │
+│                                                                             │
+│  These domains are currently throttled due to rate limiting responses...   │
+│                                                                             │
+│  ┌────────────┬─────────────────────┬───────────┬──────────────┬─────────┐ │
+│  │ Domain     │ Throttled Until     │ Remaining │ Reason       │ Actions │ │
+│  ├────────────┼─────────────────────┼───────────┼──────────────┼─────────┤ │
+│  │ gmail.com  │ Dec 10, 2025 14:30  │ 4m 30s    │ 451 too many │ Remove  │ │
+│  │ yahoo.com  │ Dec 10, 2025 14:45  │ 19m 15s   │ Rate limit...│ Remove  │ │
+│  └────────────┴─────────────────────┴───────────┴──────────────┴─────────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Test
 
