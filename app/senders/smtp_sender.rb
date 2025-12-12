@@ -250,6 +250,10 @@ class SMTPSender < BaseSender
   def requires_domain_throttle?(message)
     return false if message.blank?
 
+    # Exclude messages that contain an IP address (these are typically IP-specific blocks, not domain throttling)
+    ip_pattern = /\b(?:\d{1,3}\.){3}\d{1,3}\b/
+    return false if message.match?(ip_pattern)
+
     # Match common patterns for rate limiting responses
     # 451 is the standard code for "try again later"
     throttle_patterns = [

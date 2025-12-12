@@ -169,6 +169,82 @@ RSpec.describe QueuedMessage do
     end
   end
 
+  describe "#reallocate_ip_address" do
+    subject(:queued_message) { create(:queued_message) }
+
+    context "when ip pools is disabled" do
+      it "returns nil" do
+        expect(queued_message.reallocate_ip_address).to be nil
+      end
+
+      it "does not change the IP address" do
+        original_ip_id = queued_message.ip_address_id
+        queued_message.reallocate_ip_address
+        expect(queued_message.reload.ip_address_id).to eq original_ip_id
+      end
+    end
+
+    context "when IP pools is enabled" do
+      before do
+        allow(Postal::Config.postal).to receive(:use_ip_pools?).and_return(true)
+      end
+
+      context "when there is no backend message" do
+        it "returns nil" do
+          expect(queued_message.reallocate_ip_address).to be nil
+        end
+      end
+
+      context "when no IP pool can be determined for the message" do
+        let(:server) { create(:server) }
+        let(:message) { MessageFactory.outgoing(server) }
+
+        subject(:queued_message) { create(:queued_message, message: message) }
+
+        it "returns nil" do
+          expect(queued_message.reallocate_ip_address).to be nil
+        end
+      end
+
+      context "when an IP pool has multiple IP addresses" do
+        let(:ip_pool) { create(:ip_pool) }
+        let!(:ip_address1) { create(:ip_address, ip_pool: ip_pool, ipv4: "10.0.0.1", ipv6: "2001:db8::1") }
+        let!(:ip_address2) { create(:ip_address, ip_pool: ip_pool, ipv4: "10.0.0.2", ipv6: "2001:db8::2") }
+        let(:server) { create(:server, ip_pool: ip_pool) }
+        let(:message) { MessageFactory.outgoing(server) }
+
+        subject(:queued_message) do
+          qm = create(:queued_message, message: message)
+          qm.update_column(:ip_address_id, ip_address1.id)
+          qm
+        end
+
+        it "allocates a different IP address" do
+          queued_message.reallocate_ip_address
+          expect(queued_message.reload.ip_address_id).to eq ip_address2.id
+        end
+
+        it "updates the ip_address_id in the database" do
+          expect { queued_message.reallocate_ip_address }.to change { queued_message.reload.ip_address_id }.from(ip_address1.id).to(ip_address2.id)
+        end
+      end
+
+      context "when an IP pool has only one IP address" do
+        let(:ip_pool) { create(:ip_pool, :with_ip_address) }
+        let(:server) { create(:server, ip_pool: ip_pool) }
+        let(:message) { MessageFactory.outgoing(server) }
+
+        subject(:queued_message) { create(:queued_message, message: message) }
+
+        it "keeps the same IP address when there are no alternatives" do
+          original_ip_id = queued_message.ip_address_id
+          queued_message.reallocate_ip_address
+          expect(queued_message.reload.ip_address_id).to eq original_ip_id
+        end
+      end
+    end
+  end
+
   describe "#batchable_messages" do
     context "when the message is not locked" do
       subject(:queued_message) { build(:queued_message) }

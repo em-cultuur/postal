@@ -567,6 +567,16 @@ module MessageDequeuer
             expect(queued_message.reload.retry_after).to eq retry_time
           end
         end
+
+        it "reallocates the IP address for the retry" do
+          expect(queued_message).to receive(:reallocate_ip_address)
+          processor.process
+        end
+
+        it "logs the IP reallocation" do
+          processor.process
+          expect(logger).to have_logged(/reallocated IP address for retry/)
+        end
       end
 
       context "if the message should not be retried" do

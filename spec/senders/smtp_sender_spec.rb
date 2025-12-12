@@ -581,6 +581,18 @@ RSpec.describe SMTPSender do
     it "returns false for empty messages" do
       expect(sender.send(:requires_domain_throttle?, "")).to be false
     end
+
+    it "returns false when message contains an IPv4 address" do
+      expect(sender.send(:requires_domain_throttle?, "451 Too many messages from 192.168.1.100")).to be false
+    end
+
+    it "returns false when message contains an IP address with rate limit text" do
+      expect(sender.send(:requires_domain_throttle?, "451 Rate limit exceeded for IP 10.0.0.1, slow down")).to be false
+    end
+
+    it "returns false for IP-specific blocks" do
+      expect(sender.send(:requires_domain_throttle?, "Connection rate limit exceeded for 203.0.113.50")).to be false
+    end
   end
 
   describe "#extract_throttle_duration" do
