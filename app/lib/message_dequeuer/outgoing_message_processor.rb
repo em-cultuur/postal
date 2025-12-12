@@ -258,6 +258,12 @@ module MessageDequeuer
 
     def finish_processing
       if @result.retry
+        # Reallocate IP address on SoftFail to try with a different IP on next attempt
+        if @result.type == "SoftFail"
+          queued_message.reallocate_ip_address
+          log "reallocated IP address for retry", new_ip_address_id: queued_message.ip_address_id
+        end
+
         queued_message.retry_later(@result.retry.is_a?(Integer) ? @result.retry : nil)
         log "message requeued for trying later", retry_after: queued_message.retry_after
         stop_processing

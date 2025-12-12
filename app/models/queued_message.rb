@@ -59,6 +59,26 @@ class QueuedMessage < ApplicationRecord
     self.ip_address = pool.ip_addresses.select_by_priority
   end
 
+  # Reallocate a different IP address for retry attempts (e.g., after a SoftFail).
+  # Tries to select a different IP from the current one if possible.
+  def reallocate_ip_address
+    return unless Postal.ip_pools?
+    return if message.nil?
+
+    pool = server.ip_pool_for_message(message)
+    return if pool.nil?
+
+    available_ips = pool.ip_addresses.where.not(id: ip_address_id)
+    new_ip = if available_ips.exists?
+               available_ips.select_by_priority
+             else
+               # If there's only one IP in the pool, keep the same one
+               pool.ip_addresses.select_by_priority
+             end
+
+    update_column(:ip_address_id, new_ip.id) if new_ip
+  end
+
   def batchable_messages(limit = 10)
     unless locked?
       raise Postal::Error, "Must lock current message before locking any friends"
