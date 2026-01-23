@@ -29,6 +29,8 @@
       .noData.noData--clean
         %h2.noData__text No delivery attempts yet.
   - else
+    - ip_address_ids = message.deliveries.map(&:ip_address_id).compact.uniq
+    - ip_addresses_by_id = IPAddress.where(id: ip_address_ids).index_by(&:id)
     - for delivery in message.deliveries.reverse
       %li.deliveryList__item
         .deliveryList__top
@@ -38,13 +40,12 @@
             - if delivery.sent_with_ssl
               = image_tag 'icons/lock.svg', :class => 'deliveryList__secure'
             %span.label.label--large{:class => "label--messageStatus-#{delivery.status.underscore}"}= delivery.status.underscore.humanize
-        - if delivery.ip_address_id
-          - if ip_address = IPAddress.find_by(id: delivery.ip_address_id)
-            %p.deliveryList__info
-              %strong IP Address:
-              = ip_address.ipv4
-              - if ip_address.hostname
-                (#{ip_address.hostname})
+        - if delivery.ip_address_id && (ip_address = ip_addresses_by_id[delivery.ip_address_id])
+          %p.deliveryList__info
+            %strong IP Address:
+            = ip_address.ipv4
+            - if ip_address.hostname
+              (#{ip_address.hostname})
         - if delivery.details
           %p.deliveryList__error= format_delivery_details(@server, delivery.details)
         - if delivery.log_id || delivery.output
