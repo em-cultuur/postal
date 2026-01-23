@@ -80,7 +80,8 @@ module MessageDequeuer
                                     output: @result.output&.strip,
                                     sent_with_ssl: @result.secure,
                                     log_id: @result.log_id,
-                                    time: @result.time
+                                    time: @result.time,
+                                    ip_address_id: queued_message.ip_address_id
     end
 
     def handle_exception(exception)

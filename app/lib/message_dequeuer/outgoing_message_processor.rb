@@ -35,7 +35,7 @@ module MessageDequeuer
       return if queued_message.message.domain
 
       log "message has no domain, hard failing"
-      create_delivery "HardFail", details: "Message's domain no longer exist"
+      create_delivery "HardFail", details: "Message's domain no longer exist", ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end
@@ -44,7 +44,7 @@ module MessageDequeuer
       return unless queued_message.message.rcpt_to.blank?
 
       log "message has no 'to' address, hard failing"
-      create_delivery "HardFail", details: "Message doesn't have an RCPT to"
+      create_delivery "HardFail", details: "Message doesn't have an RCPT to", ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end
@@ -121,7 +121,8 @@ module MessageDequeuer
         log "added recipient to suppression list", recipient: queued_message.message.rcpt_to, reason: "Truemail validation failed"
 
         create_delivery "HardFail",
-                        details: "Email address validation failed: #{result.validation_message}"
+                        details: "Email address validation failed: #{result.validation_message}",
+                        ip_address_id: queued_message.ip_address_id
         remove_from_queue
         stop_processing
         return
@@ -140,7 +141,8 @@ module MessageDequeuer
       log "message is spam (#{queued_message.message.spam_score}), hard failing", server_threshold: queued_message.server.outbound_spam_threshold
       create_delivery "HardFail",
                       details: "Message is likely spam. Threshold is #{queued_message.server.outbound_spam_threshold} and " \
-                               "the message scored #{queued_message.message.spam_score}."
+                               "the message scored #{queued_message.message.spam_score}.",
+                      ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end
