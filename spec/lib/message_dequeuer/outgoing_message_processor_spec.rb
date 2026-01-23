@@ -597,6 +597,76 @@ module MessageDequeuer
       end
     end
 
+    context "when ip_address_id is set on the queued message" do
+      let(:ip_pool) { create(:ip_pool, :with_ip_address) }
+      let(:ip_address) { ip_pool.ip_addresses.first }
+      let(:server) { create(:server, ip_pool: ip_pool, organization: organization) }
+      let(:organization) { create(:organization, ip_pool: ip_pool) }
+      let(:queued_message) { create(:queued_message, :locked, message: message, ip_address: ip_address) }
+
+      before do
+        send_result.type = "Sent"
+      end
+
+      it "stores ip_address_id in the delivery for Sent status" do
+        processor.process
+        delivery = message.deliveries.last
+        expect(delivery.ip_address_id).to eq(ip_address.id)
+      end
+
+      context "when message has no domain and fails" do
+        let(:message) { MessageFactory.outgoing(server, domain: nil, credential: credential) }
+
+        it "stores ip_address_id in the delivery for HardFail status" do
+          processor.process
+          delivery = message.deliveries.last
+          expect(delivery).to have_attributes(
+            status: "HardFail",
+            ip_address_id: ip_address.id
+          )
+        end
+      end
+
+      context "when message has no rcpt_to and fails" do
+        before do
+          message.update(rcpt_to: "")
+        end
+
+        it "stores ip_address_id in the delivery for HardFail status" do
+          processor.process
+          delivery = message.deliveries.last
+          expect(delivery).to have_attributes(
+            status: "HardFail",
+            ip_address_id: ip_address.id
+          )
+        end
+      end
+
+      context "when message is spam and fails" do
+        before do
+          server.update(outbound_spam_threshold: 5.0)
+          inspection_result = double("Result",
+            spam_score: 6.0,
+            threat: false,
+            threat_message: nil,
+            spam_checks: [],
+            validation_failed: false,
+            validation_message: nil
+          )
+          allow(Postal::MessageInspection).to receive(:scan).and_return(inspection_result)
+        end
+
+        it "stores ip_address_id in the delivery for HardFail status" do
+          processor.process
+          delivery = message.deliveries.last
+          expect(delivery).to have_attributes(
+            status: "HardFail",
+            ip_address_id: ip_address.id
+          )
+        end
+      end
+    end
+
     context "when an exception occurrs during processing" do
       before do
         smtp_sender_mock = double("SMTPSender")
