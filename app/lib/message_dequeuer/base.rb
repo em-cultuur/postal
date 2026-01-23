@@ -62,7 +62,7 @@ module MessageDequeuer
       return unless queued_message.server.mode == "Development"
 
       log "server is in development mode, holding"
-      create_delivery "Held", details: "Server is in development mode."
+      create_delivery "Held", details: "Server is in development mode.", ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end
@@ -80,7 +80,8 @@ module MessageDequeuer
                                     output: @result.output&.strip,
                                     sent_with_ssl: @result.secure,
                                     log_id: @result.log_id,
-                                    time: @result.time
+                                    time: @result.time,
+                                    ip_address_id: queued_message.ip_address_id
     end
 
     def handle_exception(exception)

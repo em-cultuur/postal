@@ -64,7 +64,8 @@ module Postal
           output: output.to_s.dup.force_encoding("UTF-8").scrub.truncate(512),
           sent_with_ssl: sent_with_ssl,
           timestamp: @attributes["timestamp"],
-          time: time
+          time: time,
+          ip_address_id: ip_address_id
         }
       end
 
