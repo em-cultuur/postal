@@ -62,7 +62,7 @@ module MessageDequeuer
       return unless queued_message.server.mode == "Development"
 
       log "server is in development mode, holding"
-      create_delivery "Held", details: "Server is in development mode."
+      create_delivery "Held", details: "Server is in development mode.", ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end

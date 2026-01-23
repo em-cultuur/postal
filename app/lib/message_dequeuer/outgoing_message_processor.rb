@@ -63,7 +63,7 @@ module MessageDequeuer
       return unless queued_message.message.credential.hold?
 
       log "credential wants us to hold messages, holding"
-      create_delivery "Held", details: "Credential is configured to hold all messages authenticated by it."
+      create_delivery "Held", details: "Credential is configured to hold all messages authenticated by it.", ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end
@@ -73,7 +73,7 @@ module MessageDequeuer
       return unless sl = queued_message.server.message_db.suppression_list.get(:recipient, queued_message.message.rcpt_to)
 
       log "recipient is on the suppression list, holding"
-      create_delivery "Held", details: "Recipient (#{queued_message.message.rcpt_to}) is on the suppression list (reason: #{sl['reason']})"
+      create_delivery "Held", details: "Recipient (#{queued_message.message.rcpt_to}) is on the suppression list (reason: #{sl['reason']})", ip_address_id: queued_message.ip_address_id
       remove_from_queue
       stop_processing
     end
@@ -158,7 +158,7 @@ module MessageDequeuer
         # If we're over the limit, we're going to be holding this message
         log "server send limit has been exceeded, holding", send_limit: queued_message.server.send_limit
         queued_message.server.update_columns(send_limit_exceeded_at: Time.now, send_limit_approaching_at: nil)
-        create_delivery "Held", details: "Message held because send limit (#{queued_message.server.send_limit}) has been reached."
+        create_delivery "Held", details: "Message held because send limit (#{queued_message.server.send_limit}) has been reached.", ip_address_id: queued_message.ip_address_id
         remove_from_queue
         stop_processing
       elsif queued_message.server.send_limit_approaching?
