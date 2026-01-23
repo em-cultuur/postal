@@ -3,7 +3,7 @@
 module Postal
   module MessageDB
     module Migrations
-      class AddIpAddressIdToDeliveries < Postal::MessageDB::Migration
+      class AddIPAddressIdToDeliveries < Postal::MessageDB::Migration
 
         def up
           # Check if column already exists (for fresh installs that include it in CREATE TABLE)
