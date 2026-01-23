@@ -6,7 +6,7 @@ module Postal
       class AddIpAddressIdToDeliveries < Postal::MessageDB::Migration
 
         def up
-          @database.query("ALTER TABLE `#{@database.database_name}`.`deliveries` ADD COLUMN `ip_address_id` int(11)")
+          @database.query("ALTER TABLE `#{@database.database_name}`.`deliveries` ADD COLUMN `ip_address_id` int(11) NULL")
         end
 
         def down
