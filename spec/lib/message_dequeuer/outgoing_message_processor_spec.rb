@@ -598,10 +598,10 @@ module MessageDequeuer
     end
 
     context "when ip_address_id is set on the queued message" do
+      let(:organization) { create(:organization) }
       let(:ip_pool) { create(:ip_pool, :with_ip_address) }
       let(:ip_address) { ip_pool.ip_addresses.first }
       let(:server) { create(:server, ip_pool: ip_pool, organization: organization) }
-      let(:organization) { create(:organization, ip_pool: ip_pool) }
       let(:queued_message) { create(:queued_message, :locked, message: message, ip_address: ip_address) }
       let(:send_result) do
         SendResult.new do |r|
@@ -610,6 +610,7 @@ module MessageDequeuer
       end
 
       before do
+        organization.ip_pools << ip_pool
         mocked_sender = double("SMTPSender")
         allow(mocked_sender).to receive(:send_message).and_return(send_result)
         allow(state).to receive(:sender_for).and_return(mocked_sender)
