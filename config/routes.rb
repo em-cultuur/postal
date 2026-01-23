@@ -60,6 +60,10 @@ Rails.application.routes.draw do
         get :history, on: :collection
         get "history/:uuid", on: :collection, action: "history_request", as: "history_request"
       end
+      resources :mx_rate_limits, only: [:index] do
+        get :summary, on: :collection
+        get :stats, on: :member, constraints: { id: /[^\/]+/ }
+      end
       get :limits, on: :member
       get :retention, on: :member
       get :queue, on: :member

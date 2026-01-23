@@ -64,6 +64,8 @@ class Server < ApplicationRecord
   has_many :routes, dependent: :destroy
   has_many :queued_messages, dependent: :delete_all
   has_many :domain_throttles, dependent: :delete_all
+  has_many :mx_rate_limits, dependent: :delete_all
+  has_many :mx_rate_limit_events, dependent: :delete_all
   has_many :webhooks, dependent: :destroy
   has_many :webhook_requests, dependent: :destroy
   has_many :track_domains, dependent: :destroy
@@ -84,7 +86,7 @@ class Server < ApplicationRecord
   validates :priority, presence: true, numericality: {
     only_integer: true,
     greater_than_or_equal_to: 0,
-    less_than_or_equal_to: 32767,
+    less_than_or_equal_to: 32_767,
     message: "must be a whole number between 0 and 32,767"
   }
   before_validation(on: :create) do

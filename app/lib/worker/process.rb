@@ -36,6 +36,7 @@ module Worker
       ActionDeletionsScheduledTask,
       CheckAllDNSScheduledTask,
       CleanupAuthieSessionsScheduledTask,
+      CleanupMXRateLimitDataTask,
       ExpireHeldMessagesScheduledTask,
       ProcessMessageRetentionScheduledTask,
       PruneDomainThrottlesScheduledTask,
