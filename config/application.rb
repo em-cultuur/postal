@@ -38,7 +38,11 @@ module Postal
 
     # Load the tracking server middleware
     require "tracking_middleware"
-    config.middleware.insert_before ActionDispatch::HostAuthorization, TrackingMiddleware
+    # NOTE: Using RequestId instead of HostAuthorization because:
+    # - In development, config.hosts.clear disables HostAuthorization middleware
+    # - RequestId exists in all environments and provides equivalent early positioning
+    # - TrackingMiddleware needs to run early in the stack to capture all requests
+    config.middleware.insert_before ActionDispatch::RequestId, TrackingMiddleware
 
     config.hosts << Postal::Config.postal.web_hostname
     # Allow mta-sts subdomains for MTA-STS policy serving

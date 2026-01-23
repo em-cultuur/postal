@@ -7,9 +7,11 @@ module MessageDequeuer
       catch_stops do
         check_domain
         check_rcpt_to
+        resolve_mx_domain
         add_tag
         hold_if_credential_is_set_to_hold
         hold_if_recipient_on_suppression_list
+        skip_if_mx_rate_limited
         skip_if_domain_throttled
         parse_content
         inspect_message
@@ -19,6 +21,7 @@ module MessageDequeuer
         increment_live_stats
         hold_if_server_development_mode
         send_message_to_sender
+        handle_mx_rate_limit_response
         apply_domain_throttle_if_required
         add_recipient_to_suppression_list_on_too_many_hard_fails
         remove_recipient_from_suppression_list_on_success
@@ -221,11 +224,11 @@ module MessageDequeuer
                                    .where.not(id: queued_message.id)
                                    .update_all(retry_after: retry_after)
 
-      if updated_count > 0
-        log "throttled #{updated_count} additional queued messages for domain",
-            domain: domain,
-            retry_after: retry_after
-      end
+      return unless updated_count > 0
+
+      log "throttled #{updated_count} additional queued messages for domain",
+          domain: domain,
+          retry_after: retry_after
     end
 
     def add_recipient_to_suppression_list_on_too_many_hard_fails
@@ -273,6 +276,129 @@ module MessageDequeuer
 
       log "message processing complete"
       remove_from_queue
+    end
+
+    def resolve_mx_domain
+      queued_message.resolve_mx_domain!
+      log "resolved MX domain", mx_domain: queued_message.mx_domain
+    rescue StandardError => e
+      log "failed to resolve MX domain", error: e.message
+      # Don't block processing if resolution fails
+    end
+
+    def skip_if_mx_rate_limited
+      return if queued_message.manual?
+      return unless queued_message.mx_domain.present?
+
+      rate_limit = queued_message.mx_rate_limit
+      return unless rate_limit&.active?
+
+      # Calculate retry time based on current delay
+      retry_seconds = rate_limit.wait_seconds + 10
+      queued_message.retry_later(retry_seconds)
+
+      log "MX domain #{queued_message.mx_domain} is rate limited, requeuing",
+          mx_domain: queued_message.mx_domain,
+          current_delay: rate_limit.current_delay,
+          error_count: rate_limit.error_count,
+          retry_after: queued_message.retry_after
+
+      # Log throttled event
+      rate_limit.events.create!(
+        server_id: queued_message.server_id,
+        recipient_domain: queued_message.domain,
+        event_type: "throttled",
+        delay_before: rate_limit.current_delay,
+        delay_after: rate_limit.current_delay,
+        error_count: rate_limit.error_count,
+        success_count: rate_limit.success_count,
+        queued_message_id: queued_message.id
+      )
+
+      stop_processing
+    end
+
+    def handle_mx_rate_limit_response
+      return unless @result
+      return unless queued_message.mx_domain.present?
+
+      # Analyze SMTP response
+      if should_apply_mx_rate_limit?(@result)
+        apply_mx_rate_limit
+      elsif @result.type == "Sent"
+        record_mx_success
+      end
+    end
+
+    def should_apply_mx_rate_limit?(result)
+      return false if result.type == "Sent"
+      return false if result.output.blank?
+
+      # Check pattern matching
+      pattern = MXRateLimitPattern.match_message(result.output)
+      return false unless pattern
+
+      # Save matched pattern for logging
+      @matched_pattern = pattern
+
+      pattern.action == "rate_limit"
+    end
+
+    def apply_mx_rate_limit
+      rate_limit = MXRateLimit.find_or_initialize_by(
+        server: queued_message.server,
+        mx_domain: queued_message.mx_domain
+      )
+
+      rate_limit.record_error(
+        smtp_response: @result.output,
+        pattern: @matched_pattern&.name,
+        queued_message: queued_message
+      )
+
+      log "applied MX rate limit",
+          mx_domain: queued_message.mx_domain,
+          error_count: rate_limit.error_count,
+          current_delay: rate_limit.current_delay,
+          matched_pattern: @matched_pattern&.name
+
+      # Requeue pending messages for same MX
+      requeue_messages_for_mx(queued_message.mx_domain, rate_limit.current_delay)
+    end
+
+    def record_mx_success
+      rate_limit = MXRateLimit.find_by(
+        server: queued_message.server,
+        mx_domain: queued_message.mx_domain
+      )
+
+      return unless rate_limit
+
+      rate_limit.record_success(queued_message: queued_message)
+
+      return unless rate_limit.current_delay == 0
+
+      log "MX rate limit cleared",
+          mx_domain: queued_message.mx_domain,
+          success_count: rate_limit.success_count
+    end
+
+    def requeue_messages_for_mx(mx_domain, delay_seconds)
+      retry_after = Time.current + delay_seconds.seconds + 10.seconds
+
+      # Update all queued messages for this MX domain
+      updated_count = QueuedMessage
+                      .where(server_id: queued_message.server_id, mx_domain: mx_domain)
+                      .where("retry_after IS NULL OR retry_after < ?", retry_after)
+                      .where.not(id: queued_message.id)
+                      .update_all(retry_after: retry_after)
+
+      return unless updated_count > 0
+
+      log "requeued messages for MX domain",
+          mx_domain: mx_domain,
+          count: updated_count,
+          retry_after: retry_after
     end
 
   end

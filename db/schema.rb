@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 20251210000001) do
+ActiveRecord::Schema[7.1].define(version: 2026_01_23_000005) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -173,6 +173,67 @@ ActiveRecord::Schema[7.1].define(version: 20251210000001) do
     t.index ["uuid"], name: "index_ip_pools_on_uuid", length: 8
   end
 
+  create_table "mx_domain_cache", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
+    t.string "recipient_domain", null: false
+    t.string "mx_domain", null: false
+    t.text "mx_records"
+    t.datetime "resolved_at", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.index ["expires_at"], name: "index_mx_domain_cache_on_expires_at"
+    t.index ["recipient_domain"], name: "index_mx_domain_cache_on_recipient_domain", unique: true
+  end
+
+  create_table "mx_rate_limit_events", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
+    t.integer "server_id", null: false
+    t.string "mx_domain", null: false
+    t.string "recipient_domain"
+    t.string "event_type", null: false
+    t.integer "delay_before"
+    t.integer "delay_after"
+    t.integer "error_count"
+    t.integer "success_count"
+    t.text "smtp_response"
+    t.string "matched_pattern"
+    t.integer "queued_message_id"
+    t.datetime "created_at", precision: nil
+    t.index ["created_at"], name: "index_mx_rate_limit_events_on_created_at"
+    t.index ["event_type"], name: "index_mx_rate_limit_events_on_event_type"
+    t.index ["queued_message_id"], name: "index_mx_rate_limit_events_on_queued_message_id"
+    t.index ["server_id", "mx_domain"], name: "index_mx_rate_limit_events_on_server_and_mx"
+  end
+
+  create_table "mx_rate_limit_patterns", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "pattern", null: false
+    t.boolean "enabled", default: true
+    t.integer "priority", default: 0
+    t.string "action"
+    t.integer "suggested_delay"
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.index ["enabled"], name: "index_mx_rate_limit_patterns_on_enabled"
+    t.index ["priority"], name: "index_mx_rate_limit_patterns_on_priority"
+  end
+
+  create_table "mx_rate_limits", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
+    t.integer "server_id", null: false
+    t.string "mx_domain", null: false
+    t.integer "current_delay", default: 0
+    t.integer "error_count", default: 0
+    t.integer "success_count", default: 0
+    t.datetime "last_error_at"
+    t.datetime "last_success_at"
+    t.string "last_error_message"
+    t.integer "max_attempts", default: 10
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.index ["current_delay"], name: "index_mx_rate_limits_on_current_delay"
+    t.index ["last_error_at"], name: "index_mx_rate_limits_on_last_error_at"
+    t.index ["server_id", "mx_domain"], name: "index_mx_rate_limits_on_server_and_mx", unique: true
+  end
+
   create_table "organization_ip_pools", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "organization_id"
     t.integer "ip_pool_id"
@@ -219,8 +280,10 @@ ActiveRecord::Schema[7.1].define(version: 20251210000001) do
     t.integer "route_id"
     t.boolean "manual", default: false
     t.string "batch_key"
+    t.string "mx_domain"
     t.index ["domain"], name: "index_queued_messages_on_domain", length: 8
     t.index ["message_id"], name: "index_queued_messages_on_message_id"
+    t.index ["mx_domain"], name: "index_queued_messages_on_mx_domain"
     t.index ["server_id"], name: "index_queued_messages_on_server_id"
   end
 
@@ -406,4 +469,6 @@ ActiveRecord::Schema[7.1].define(version: 20251210000001) do
     t.index ["role"], name: "index_worker_roles_on_role", unique: true
   end
 
+  add_foreign_key "mx_rate_limit_events", "servers"
+  add_foreign_key "mx_rate_limits", "servers"
 end
