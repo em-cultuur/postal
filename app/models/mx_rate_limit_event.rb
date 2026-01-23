@@ -58,11 +58,12 @@ class MXRateLimitEvent < ApplicationRecord
       .count
   end
 
-  # Delete events older than 30 days
+  # Delete events older than retention period
   #
   # @return [Integer] the number of records deleted
   def self.cleanup_old
-    where("created_at < ?", 30.days.ago).delete_all
+    retention_days = Postal::Config.postal.mx_rate_limiting_event_retention_days
+    where("created_at < ?", retention_days.days.ago).delete_all
   end
 
 end

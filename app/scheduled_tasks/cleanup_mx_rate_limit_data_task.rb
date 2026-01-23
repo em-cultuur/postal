@@ -9,8 +9,9 @@ class CleanupMXRateLimitDataTask < ApplicationScheduledTask
   end
 
   def self.next_run_after
-    # Run every hour
-    1.hour.from_now
+    # Use configured cleanup interval
+    interval = Postal::Config.postal.mx_rate_limiting_cleanup_interval
+    interval.seconds.from_now
   end
 
   private

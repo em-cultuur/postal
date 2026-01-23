@@ -23,8 +23,12 @@ class MXDomainCache < ApplicationRecord
 
   self.table_name = "mx_domain_cache"
 
-  # Default cache TTL (1 hour)
-  DEFAULT_TTL = 3600
+  # Get cache TTL from configuration
+  #
+  # @return [Integer] TTL in seconds
+  def self.cache_ttl
+    Postal::Config.postal.mx_rate_limiting_mx_cache_ttl
+  end
 
   validates :recipient_domain, presence: true
   validates :mx_domain, presence: true

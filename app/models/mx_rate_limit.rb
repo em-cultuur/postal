@@ -30,18 +30,6 @@
 
 class MXRateLimit < ApplicationRecord
 
-  # Delay increment per error (5 minutes)
-  DELAY_INCREMENT = 300
-
-  # Maximum delay (60 minutes)
-  MAX_DELAY = 3600
-
-  # Successes needed to reduce delay
-  RECOVERY_SUCCESS_THRESHOLD = 5
-
-  # Delay reduction per recovery step (2 minutes)
-  DELAY_DECREMENT = 120
-
   belongs_to :server
 
   has_many :events,
@@ -57,6 +45,38 @@ class MXRateLimit < ApplicationRecord
   scope :active, -> { where("current_delay > ?", 0) }
   scope :inactive, -> { where(current_delay: 0) }
 
+  # Configuration accessors
+  #
+  # @return [Integer] delay increment in seconds
+  def self.delay_increment
+    Postal::Config.postal.mx_rate_limiting_delay_increment
+  end
+
+  # @return [Integer] maximum delay in seconds
+  def self.max_delay
+    Postal::Config.postal.mx_rate_limiting_max_delay
+  end
+
+  # @return [Integer] recovery success threshold
+  def self.recovery_threshold
+    Postal::Config.postal.mx_rate_limiting_recovery_threshold
+  end
+
+  # @return [Integer] delay decrement in seconds
+  def self.delay_decrement
+    Postal::Config.postal.mx_rate_limiting_delay_decrement
+  end
+
+  # @return [Boolean] whether MX rate limiting is enabled
+  def self.enabled?
+    Postal::Config.postal.mx_rate_limiting_enabled
+  end
+
+  # @return [Boolean] whether running in shadow mode
+  def self.shadow_mode?
+    Postal::Config.postal.mx_rate_limiting_shadow_mode
+  end
+
   # Check if an MX domain is currently rate limited for a given server
   #
   # @param server [Server] the server to check
@@ -68,12 +88,13 @@ class MXRateLimit < ApplicationRecord
     active.exists?(server: server, mx_domain: mx_domain.downcase)
   end
 
-  # Remove inactive rate limits (delay=0, last_success > 24h ago)
+  # Remove inactive rate limits (delay=0, last_success > cleanup threshold)
   #
   # @return [Integer] the number of records deleted
   def self.cleanup_inactive
+    cleanup_hours = Postal::Config.postal.mx_rate_limiting_inactive_cleanup_hours
     inactive
-      .where("last_success_at < ?", 24.hours.ago)
+      .where("last_success_at < ?", cleanup_hours.hours.ago)
       .delete_all
   end
 
@@ -86,9 +107,12 @@ class MXRateLimit < ApplicationRecord
   def record_error(smtp_response:, pattern: nil, queued_message: nil)
     transaction do
       increment!(:error_count)
+      delay_inc = self.class.delay_increment
+      max_delay_val = self.class.max_delay
+
       update_columns(
         success_count: 0,
-        current_delay: [current_delay + DELAY_INCREMENT, MAX_DELAY].min,
+        current_delay: [current_delay + delay_inc, max_delay_val].min,
         last_error_at: Time.current,
         last_error_message: smtp_response.to_s.truncate(255)
       )
@@ -99,7 +123,7 @@ class MXRateLimit < ApplicationRecord
         mx_domain: mx_domain,
         recipient_domain: queued_message&.domain,
         event_type: "error",
-        delay_before: current_delay - DELAY_INCREMENT,
+        delay_before: current_delay - delay_inc,
         delay_after: current_delay,
         error_count: error_count,
         success_count: success_count,
@@ -138,9 +162,12 @@ class MXRateLimit < ApplicationRecord
       )
 
       # Check if we should reduce delay
-      if success_count >= RECOVERY_SUCCESS_THRESHOLD && current_delay > 0
+      recovery_thresh = self.class.recovery_threshold
+      delay_dec = self.class.delay_decrement
+
+      if success_count >= recovery_thresh && current_delay > 0
         previous_delay = current_delay
-        new_delay = [current_delay - DELAY_DECREMENT, 0].max
+        new_delay = [current_delay - delay_dec, 0].max
 
         update_columns(
           current_delay: new_delay,

@@ -771,55 +771,100 @@ scheduled_tasks:
 
 ### Configuration Schema
 
-**File:** `lib/postal/config/config_schema.rb`
+**File:** `lib/postal/config_schema.rb`
 
-Add to `:postal` section:
+Add to `:postal` group (inside `group :postal do` block):
 
 ```ruby
-mx_rate_limiting: {
-  type: :hash,
-  default: {},
-  schema: {
-    enabled: { type: :boolean, default: true },
-    shadow_mode: { type: :boolean, default: false },
-    delay_increment: { type: :integer, default: 300 },
-    max_delay: { type: :integer, default: 3600 },
-    recovery_threshold: { type: :integer, default: 5 },
-    delay_decrement: { type: :integer, default: 120 },
-    mx_cache_ttl: { type: :integer, default: 3600 },
-    cleanup_interval: { type: :integer, default: 3600 }
-  }
-}
+boolean :mx_rate_limiting_enabled do
+  description "Enable MX-based rate limiting system"
+  default true
+end
+
+boolean :mx_rate_limiting_shadow_mode do
+  description "Log rate limiting decisions without actually throttling messages"
+  default false
+end
+
+integer :mx_rate_limiting_delay_increment do
+  description "Seconds to add per consecutive error (linear backoff)"
+  default 300
+end
+
+integer :mx_rate_limiting_max_delay do
+  description "Maximum delay in seconds (cap for backoff)"
+  default 3600
+end
+
+integer :mx_rate_limiting_recovery_threshold do
+  description "Number of consecutive successes needed for one recovery step"
+  default 5
+end
+
+integer :mx_rate_limiting_delay_decrement do
+  description "Seconds to reduce per recovery step"
+  default 120
+end
+
+integer :mx_rate_limiting_mx_cache_ttl do
+  description "MX DNS cache TTL in seconds"
+  default 3600
+end
+
+integer :mx_rate_limiting_cleanup_interval do
+  description "Cleanup task interval in seconds"
+  default 3600
+end
+
+integer :mx_rate_limiting_event_retention_days do
+  description "Number of days to retain MX rate limit events"
+  default 30
+end
+
+integer :mx_rate_limiting_inactive_cleanup_hours do
+  description "Hours after last success before cleaning up inactive rate limits"
+  default 24
+end
 ```
+
+**Note:** Configuration keys are placed directly under the `postal:` group using the
+`mx_rate_limiting_` prefix, not as a nested group.
 
 ### Configuration Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `enabled` | Boolean | `true` | Enable MX rate limiting system |
-| `shadow_mode` | Boolean | `false` | Log only, don't actually throttle messages |
-| `delay_increment` | Integer | `300` | Seconds to add per error (5 minutes) |
-| `max_delay` | Integer | `3600` | Maximum delay in seconds (60 minutes) |
-| `recovery_threshold` | Integer | `5` | Successes needed for one recovery step |
-| `delay_decrement` | Integer | `120` | Seconds to reduce per recovery (2 minutes) |
-| `mx_cache_ttl` | Integer | `3600` | MX DNS cache TTL in seconds (1 hour) |
-| `cleanup_interval` | Integer | `3600` | Cleanup task interval in seconds (1 hour) |
+| `mx_rate_limiting_enabled` | Boolean | `true` | Enable MX rate limiting system |
+| `mx_rate_limiting_shadow_mode` | Boolean | `false` | Log only, don't actually throttle messages |
+| `mx_rate_limiting_delay_increment` | Integer | `300` | Seconds to add per error (5 minutes) |
+| `mx_rate_limiting_max_delay` | Integer | `3600` | Maximum delay in seconds (60 minutes) |
+| `mx_rate_limiting_recovery_threshold` | Integer | `5` | Successes needed for one recovery step |
+| `mx_rate_limiting_delay_decrement` | Integer | `120` | Seconds to reduce per recovery (2 minutes) |
+| `mx_rate_limiting_mx_cache_ttl` | Integer | `3600` | MX DNS cache TTL in seconds (1 hour) |
+| `mx_rate_limiting_cleanup_interval` | Integer | `3600` | Cleanup task interval in seconds (1 hour) |
+| `mx_rate_limiting_event_retention_days` | Integer | `30` | Days to retain event records |
+| `mx_rate_limiting_inactive_cleanup_hours` | Integer | `24` | Hours after last success before cleanup |
 
 ### Example Configuration
 
 ```yaml
 # config/postal/postal.yml
 postal:
-  mx_rate_limiting:
-    enabled: true
-    shadow_mode: false
-    delay_increment: 300      # 5 minutes per error
-    max_delay: 3600           # max 1 hour delay
-    recovery_threshold: 5     # 5 successes to recover
-    delay_decrement: 120      # -2 minutes per recovery
-    mx_cache_ttl: 3600        # 1 hour DNS cache
-    cleanup_interval: 3600    # cleanup every hour
+  # MX Rate Limiting Configuration
+  mx_rate_limiting_enabled: true                    # Enable/disable the system
+  mx_rate_limiting_shadow_mode: false               # Log only without throttling
+  mx_rate_limiting_delay_increment: 300             # 5 minutes per error
+  mx_rate_limiting_max_delay: 3600                  # max 1 hour delay
+  mx_rate_limiting_recovery_threshold: 5            # 5 successes to recover
+  mx_rate_limiting_delay_decrement: 120             # -2 minutes per recovery
+  mx_rate_limiting_mx_cache_ttl: 3600               # 1 hour DNS cache
+  mx_rate_limiting_cleanup_interval: 3600           # cleanup every hour
+  mx_rate_limiting_event_retention_days: 30         # keep events for 30 days
+  mx_rate_limiting_inactive_cleanup_hours: 24       # cleanup after 24h inactive
 ```
+
+**Note:** All configuration keys are prefixed with `mx_rate_limiting_` and placed directly
+under the `postal:` group. These are the default values and can be customized as needed.
 
 ---
 

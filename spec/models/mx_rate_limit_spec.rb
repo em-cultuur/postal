@@ -131,16 +131,16 @@ RSpec.describe MXRateLimit do
       expect(rate_limit.reload.success_count).to eq(0)
     end
 
-    it "increases current_delay by DELAY_INCREMENT" do
+    it "increases current_delay by configured increment" do
       expect do
         rate_limit.record_error(smtp_response: "421 Try again later")
-      end.to change { rate_limit.reload.current_delay }.from(0).to(MXRateLimit::DELAY_INCREMENT)
+      end.to change { rate_limit.reload.current_delay }.from(0).to(MXRateLimit.delay_increment)
     end
 
-    it "caps current_delay at MAX_DELAY" do
-      rate_limit.update(current_delay: MXRateLimit::MAX_DELAY - 100)
+    it "caps current_delay at configured maximum" do
+      rate_limit.update(current_delay: MXRateLimit.max_delay - 100)
       rate_limit.record_error(smtp_response: "421 Try again later")
-      expect(rate_limit.reload.current_delay).to eq(MXRateLimit::MAX_DELAY)
+      expect(rate_limit.reload.current_delay).to eq(MXRateLimit.max_delay)
     end
 
     it "updates last_error_at" do
@@ -179,7 +179,7 @@ RSpec.describe MXRateLimit do
 
       event = MXRateLimitEvent.where(event_type: "delay_increased").last
       expect(event.delay_before).to eq(0)
-      expect(event.delay_after).to eq(MXRateLimit::DELAY_INCREMENT)
+      expect(event.delay_after).to eq(MXRateLimit.delay_increment)
     end
   end
 
@@ -211,15 +211,15 @@ RSpec.describe MXRateLimit do
       end.to change { MXRateLimitEvent.where(event_type: "success").count }.by(1)
     end
 
-    context "when success_count reaches RECOVERY_SUCCESS_THRESHOLD" do
+    context "when success_count reaches configured recovery threshold" do
       before do
-        rate_limit.update(success_count: MXRateLimit::RECOVERY_SUCCESS_THRESHOLD - 1, current_delay: 600)
+        rate_limit.update(success_count: MXRateLimit.recovery_threshold - 1, current_delay: 600)
       end
 
-      it "decreases current_delay by DELAY_DECREMENT" do
+      it "decreases current_delay by configured decrement" do
         expect do
           rate_limit.record_success
-        end.to change { rate_limit.reload.current_delay }.from(600).to(600 - MXRateLimit::DELAY_DECREMENT)
+        end.to change { rate_limit.reload.current_delay }.from(600).to(600 - MXRateLimit.delay_decrement)
       end
 
       it "resets success_count to 0" do

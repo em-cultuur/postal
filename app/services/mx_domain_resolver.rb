@@ -4,8 +4,6 @@ require "resolv"
 
 class MXDomainResolver
 
-  CACHE_TTL = 1.hour
-
   def initialize(recipient_domain:)
     @recipient_domain = recipient_domain
   end
@@ -70,11 +68,12 @@ class MXDomainResolver
   end
 
   def cache_mx_domain(mx_domain)
+    ttl = MXDomainCache.cache_ttl
     cache = MXDomainCache.find_or_initialize_by(recipient_domain: @recipient_domain)
     cache.mx_domain = mx_domain
     cache.mx_records = [] # Could store full MX records if needed in future
     cache.resolved_at = Time.current
-    cache.expires_at = CACHE_TTL.from_now
+    cache.expires_at = ttl.seconds.from_now
     cache.save!
   end
 
