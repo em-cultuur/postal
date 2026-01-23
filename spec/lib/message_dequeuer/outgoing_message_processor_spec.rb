@@ -603,9 +603,16 @@ module MessageDequeuer
       let(:server) { create(:server, ip_pool: ip_pool, organization: organization) }
       let(:organization) { create(:organization, ip_pool: ip_pool) }
       let(:queued_message) { create(:queued_message, :locked, message: message, ip_address: ip_address) }
+      let(:send_result) do
+        SendResult.new do |r|
+          r.type = "Sent"
+        end
+      end
 
       before do
-        send_result.type = "Sent"
+        mocked_sender = double("SMTPSender")
+        allow(mocked_sender).to receive(:send_message).and_return(send_result)
+        allow(state).to receive(:sender_for).and_return(mocked_sender)
       end
 
       it "stores ip_address_id in the delivery for Sent status" do
