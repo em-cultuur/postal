@@ -99,6 +99,10 @@ jobs:
         run: docker compose pull mariadb
         env:
           POSTAL_IMAGE: ghcr.io/modalsource/postal:ci-${{ github.sha }}
+      - name: Prepare database
+        run: docker compose run --rm postal sh -c 'bundle exec rails db:prepare'
+        env:
+          POSTAL_IMAGE: ghcr.io/modalsource/postal:ci-${{ github.sha }}
       - run: docker compose run --rm postal sh -c 'bundle exec rspec'
         env:
           POSTAL_IMAGE: ghcr.io/modalsource/postal:ci-${{ github.sha }}

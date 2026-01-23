@@ -16,7 +16,9 @@ module Postal
                                                details: "varchar(512) DEFAULT NULL",
                                                sent_with_ssl: "tinyint(1) DEFAULT 0",
                                                log_id: "varchar(100) DEFAULT NULL",
-                                               timestamp: "decimal(18,6) DEFAULT NULL"
+                                               timestamp: "decimal(18,6) DEFAULT NULL",
+                                               time: "decimal(8,2) DEFAULT NULL",
+                                               ip_address_id: "int(11) DEFAULT NULL"
                                              },
                                              indexes: {
                                                on_message_id: "`message_id`"
