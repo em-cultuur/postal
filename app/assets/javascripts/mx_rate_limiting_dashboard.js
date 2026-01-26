@@ -1,5 +1,3 @@
-// frozen_string_literal: true
-
 document.addEventListener('turbolinks:load', function() {
   var chartContainer = document.getElementById('mxRateLimitingChart');
   
