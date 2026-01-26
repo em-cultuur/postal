@@ -1,0 +1,348 @@
+openapi: 3.0.0
+info:
+  title: MX Rate Limiting API
+  description: API for managing and monitoring MX-based rate limiting in Postal
+  version: 1.0.0
+  contact:
+    name: Postal Support
+    url: https://postal.io
+  license:
+    name: MIT
+
+servers:
+  - url: https://{hostname}/organizations/{organization_id}/servers/{server_id}
+    description: Production server
+    variables:
+      hostname:
+        default: postal.example.com
+        description: Your Postal hostname
+      organization_id:
+        default: example-org
+        description: Organization identifier
+      server_id:
+        default: example-server
+        description: Server identifier
+
+components:
+  schemas:
+    RateLimit:
+      type: object
+      description: MX rate limit record for a specific mail server
+      properties:
+        mx_domain:
+          type: string
+          example: mail.example.com
+          description: The MX mail server domain
+        current_delay_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          example: 600
+          description: Current backoff delay in seconds
+        error_count:
+          type: integer
+          minimum: 0
+          example: 5
+          description: Total delivery errors for this MX domain
+        success_count:
+          type: integer
+          minimum: 0
+          example: 20
+          description: Total successful deliveries to this MX domain
+        last_error_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-26T10:30:00Z"
+          description: Timestamp of last error
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-26T10:40:00Z"
+          description: Timestamp of last success
+        last_error_message:
+          type: string
+          nullable: true
+          example: "421"
+          description: SMTP response code from last error (sanitized to 3-digit code only)
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-20T08:00:00Z"
+          description: Rate limit record creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-26T10:40:00Z"
+          description: Rate limit record update timestamp
+      required:
+        - mx_domain
+        - current_delay_seconds
+        - error_count
+        - success_count
+        - created_at
+        - updated_at
+
+    Event:
+      type: object
+      description: Rate limiting event for an MX domain
+      properties:
+        event_type:
+          type: string
+          enum:
+            - error
+            - success
+            - delay_increased
+            - delay_decreased
+          example: error
+          description: The type of event
+        smtp_response:
+          type: string
+          nullable: true
+          example: "421"
+          description: SMTP response code (only present for error events)
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-26T10:30:00Z"
+          description: Event timestamp
+      required:
+        - event_type
+        - created_at
+
+    RateLimitListResponse:
+      type: object
+      properties:
+        rate_limits:
+          type: array
+          description: List of rate limit records
+          items:
+            $ref: "#/components/schemas/RateLimit"
+      required:
+        - rate_limits
+
+    Summary:
+      type: object
+      description: Aggregated statistics for all rate limits
+      properties:
+        active_rate_limits:
+          type: integer
+          minimum: 0
+          example: 3
+          description: Number of MX domains with non-zero delay
+        total_rate_limits:
+          type: integer
+          minimum: 0
+          example: 45
+          description: Total unique MX domains being tracked
+        events_last_24h:
+          type: integer
+          minimum: 0
+          example: 127
+          description: Total events in last 24 hours
+        errors_last_24h:
+          type: integer
+          minimum: 0
+          example: 23
+          description: Total error events in last 24 hours
+        successes_last_24h:
+          type: integer
+          minimum: 0
+          example: 104
+          description: Total success events in last 24 hours
+      required:
+        - active_rate_limits
+        - total_rate_limits
+        - events_last_24h
+        - errors_last_24h
+        - successes_last_24h
+
+    SummaryResponse:
+      type: object
+      properties:
+        summary:
+          $ref: "#/components/schemas/Summary"
+      required:
+        - summary
+
+    RateLimitStatsResponse:
+      type: object
+      properties:
+        rate_limit:
+          $ref: "#/components/schemas/RateLimit"
+        events_last_24h:
+          type: array
+          description: Events for this MX domain in the last 24 hours
+          items:
+            $ref: "#/components/schemas/Event"
+      required:
+        - rate_limit
+        - events_last_24h
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid request"
+          description: Error message
+      required:
+        - error
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: API token in Authorization header
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+      description: Session cookie from web login
+
+security:
+  - BearerAuth: []
+  - SessionAuth: []
+
+paths:
+  /mx_rate_limits:
+    get:
+      summary: List all rate limits for a server
+      operationId: listRateLimits
+      description: Retrieve active and inactive rate limits for the specified server
+      tags:
+        - Rate Limits
+      parameters:
+        - name: organization_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+        - name: server_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Server identifier
+      responses:
+        "200":
+          description: Successful response with list of rate limits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitListResponse"
+        "401":
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found - organization or server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /mx_rate_limits/summary:
+    get:
+      summary: Get summary statistics
+      operationId: getRateLimitSummary
+      description: Retrieve aggregated statistics for all rate limits on the server
+      tags:
+        - Statistics
+      parameters:
+        - name: organization_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+        - name: server_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Server identifier
+      responses:
+        "200":
+          description: Successful response with summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummaryResponse"
+        "401":
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found - organization or server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  "/mx_rate_limits/{mx_domain}/stats":
+    get:
+      summary: Get statistics for specific MX domain
+      operationId: getMXDomainStats
+      description: Retrieve detailed statistics and recent events for a specific MX domain
+      tags:
+        - Statistics
+      parameters:
+        - name: organization_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+        - name: server_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Server identifier
+        - name: mx_domain
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9.-]{1,255}$"
+          example: mail.example.com
+          description: MX mail server domain
+      responses:
+        "200":
+          description: Successful response with rate limit statistics and events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitStatsResponse"
+        "401":
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found - organization, server, or MX domain not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid Request - domain format invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+tags:
+  - name: Rate Limits
+    description: Operations related to rate limit records
+  - name: Statistics
+    description: Operations for retrieving statistics and metrics

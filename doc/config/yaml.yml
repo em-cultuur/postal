@@ -57,6 +57,7 @@ postal:
   mx_rate_limiting_event_retention_days: 30
   # Hours after last success before cleaning up inactive rate limits
   mx_rate_limiting_inactive_cleanup_hours: 24
+
 web_server:
   # The default port the web server should listen on unless overriden by the PORT environment variable
   default_port: 5000
