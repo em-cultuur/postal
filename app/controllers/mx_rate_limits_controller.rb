@@ -157,4 +157,25 @@ class MXRateLimitsController < ApplicationController
 
   helper_method :prepare_chart_json
 
+  # Format delay in seconds to human-readable format
+  #
+  # @param seconds [Integer] the number of seconds
+  # @return [String] human-readable format (e.g., "5m", "1h", "No delay")
+  def format_delay_human(seconds)
+    return "No delay" if seconds.zero?
+
+    case seconds
+    when 1..59
+      "#{seconds}s"
+    when 60..3599
+      minutes = (seconds / 60.0).round(1)
+      minutes == minutes.to_i ? "#{minutes.to_i}m" : "#{minutes}m"
+    else
+      hours = (seconds / 3600.0).round(1)
+      hours == hours.to_i ? "#{hours.to_i}h" : "#{hours}h"
+    end
+  end
+
+  helper_method :format_delay_human
+
 end

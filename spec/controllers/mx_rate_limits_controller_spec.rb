@@ -206,3 +206,61 @@ RSpec.describe "MxRateLimits API", type: :request do
     end
   end
 end
+
+# Tests for the format_delay_human helper method
+describe "MXRateLimitsController#format_delay_human", type: :controller do
+  let(:controller_instance) { MXRateLimitsController.new }
+
+  describe "formatting seconds to human-readable delay" do
+    it "formats zero delay as 'No delay'" do
+      result = controller_instance.send(:format_delay_human, 0)
+      expect(result).to eq("No delay")
+    end
+
+    it "formats seconds between 1-59 as seconds" do
+      expect(controller_instance.send(:format_delay_human, 1)).to eq("1s")
+      expect(controller_instance.send(:format_delay_human, 30)).to eq("30s")
+      expect(controller_instance.send(:format_delay_human, 59)).to eq("59s")
+    end
+
+    it "formats 60 seconds as '1m'" do
+      result = controller_instance.send(:format_delay_human, 60)
+      expect(result).to eq("1m")
+    end
+
+    it "formats 300 seconds as '5m'" do
+      result = controller_instance.send(:format_delay_human, 300)
+      expect(result).to eq("5m")
+    end
+
+    it "formats 90 seconds as '1.5m'" do
+      result = controller_instance.send(:format_delay_human, 90)
+      expect(result).to eq("1.5m")
+    end
+
+    it "formats 3599 seconds as '60m'" do
+      result = controller_instance.send(:format_delay_human, 3599)
+      expect(result).to match(/59\.\d+m|60m/)
+    end
+
+    it "formats 3600 seconds as '1h'" do
+      result = controller_instance.send(:format_delay_human, 3600)
+      expect(result).to eq("1h")
+    end
+
+    it "formats 7200 seconds as '2h'" do
+      result = controller_instance.send(:format_delay_human, 7200)
+      expect(result).to eq("2h")
+    end
+
+    it "formats 10800 seconds as '3h'" do
+      result = controller_instance.send(:format_delay_human, 10_800)
+      expect(result).to eq("3h")
+    end
+
+    it "formats large delays with decimal hours" do
+      result = controller_instance.send(:format_delay_human, 5400)
+      expect(result).to eq("1.5h")
+    end
+  end
+end

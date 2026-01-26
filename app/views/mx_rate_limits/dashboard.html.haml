@@ -27,11 +27,11 @@
 
           .mxRateLimitingDashboard__stat
             %dt.mxRateLimitingDashboard__statLabel Max Delay
-            %dd.mxRateLimitingDashboard__statValue= number_to_human_size(@summary[:max_delay], units: { each: "" }).gsub("B", "") + "s"
+            %dd.mxRateLimitingDashboard__statValue= format_delay_human(@summary[:max_delay])
 
           .mxRateLimitingDashboard__stat
             %dt.mxRateLimitingDashboard__statLabel Avg Delay
-            %dd.mxRateLimitingDashboard__statValue= number_to_human_size(@summary[:avg_delay], units: { each: "" }).gsub("B", "") + "s"
+            %dd.mxRateLimitingDashboard__statValue= format_delay_human(@summary[:avg_delay])
 
       / Events Chart Section
       - if @recent_events.any?
@@ -73,7 +73,7 @@
                     %code= rate_limit.mx_domain
                   %td.dataTable__rightCell
                     %span.mxRateLimitingDashboard__delayBadge{:class => "#{rate_limit.current_delay > 1800 ? 'is-critical' : rate_limit.current_delay > 600 ? 'is-warning' : 'is-normal'}"}
-                      = "#{rate_limit.current_delay}s"
+                      = format_delay_human(rate_limit.current_delay)
                   %td.dataTable__centerCell= rate_limit.error_count
                   %td.dataTable__centerCell= rate_limit.success_count
                   %td.dataTable__centerCell
