@@ -4,24 +4,26 @@
 #
 # Table name: mx_rate_limits
 #
-#  id                 :integer          not null, primary key
-#  current_delay      :integer          default(0)
-#  error_count        :integer          default(0)
-#  last_error_at      :datetime
-#  last_error_message :string(255)
-#  last_success_at    :datetime
-#  max_attempts       :integer          default(10)
-#  mx_domain          :string(255)      not null
-#  success_count      :integer          default(0)
-#  created_at         :datetime         not null
-#  updated_at         :datetime         not null
-#  server_id          :integer          not null
+#  id                                                 :integer          not null, primary key
+#  current_delay                                      :integer          default(0)
+#  error_count                                        :integer          default(0)
+#  last_error_at                                      :datetime
+#  last_error_message                                 :string(255)
+#  last_success_at                                    :datetime
+#  max_attempts                                       :integer          default(10)
+#  mx_domain                                          :string(255)      not null
+#  success_count                                      :integer          default(0)
+#  whitelisted(Skip rate limiting for this MX domain) :boolean          default(FALSE)
+#  created_at                                         :datetime         not null
+#  updated_at                                         :datetime         not null
+#  server_id                                          :integer          not null
 #
 # Indexes
 #
 #  index_mx_rate_limits_on_current_delay  (current_delay)
 #  index_mx_rate_limits_on_last_error_at  (last_error_at)
 #  index_mx_rate_limits_on_server_and_mx  (server_id,mx_domain) UNIQUE
+#  index_mx_rate_limits_whitelisted       (server_id,whitelisted)
 #
 # Foreign Keys
 #
@@ -43,6 +45,9 @@ class MXRateLimit < ApplicationRecord
            foreign_key: :server_id,
            primary_key: :server_id,
            dependent: :delete_all
+
+  # NOTE: whitelist is managed separately in MXRateLimitWhitelist table
+  # Use MXRateLimitWhitelist.whitelisted?(server, mx_domain) to check
 
   validates :mx_domain, presence: true
   validates :mx_domain, uniqueness: { scope: :server_id }
@@ -91,7 +96,19 @@ class MXRateLimit < ApplicationRecord
   def self.rate_limited?(server, mx_domain)
     return false if mx_domain.blank?
 
+    # Check if domain is whitelisted first
+    return false if MXRateLimitWhitelist.whitelisted?(server, mx_domain)
+
     active.exists?(server: server, mx_domain: mx_domain.downcase)
+  end
+
+  # Check if an MX domain is whitelisted and should skip rate limiting
+  #
+  # @param server [Server] the server to check
+  # @param mx_domain [String] the MX domain to check
+  # @return [Boolean] true if whitelisted
+  def self.whitelisted?(server, mx_domain)
+    MXRateLimitWhitelist.whitelisted?(server, mx_domain)
   end
 
   # Remove inactive rate limits (delay=0, last_success > cleanup threshold)

@@ -48,6 +48,109 @@ class MXRateLimitsController < ApplicationController
     redirect_to organization_server_mx_rate_limits_path(@organization, @server)
   end
 
+  def whitelists
+    @whitelists = @server.mx_rate_limit_whitelists.order(created_at: :desc)
+
+    respond_to do |wants|
+      wants.html do
+        render :whitelists
+      end
+      wants.json do
+        render json: {
+          whitelists: @whitelists.map do |wl|
+            {
+              id: wl.id,
+              mx_domain: wl.mx_domain,
+              pattern_type: wl.pattern_type,
+              description: wl.description,
+              created_by: wl.created_by&.email,
+              created_at: wl.created_at,
+              updated_at: wl.updated_at
+            }
+          end
+        }
+      end
+    end
+  end
+
+  def create_whitelist
+    mx_domain = params[:mx_domain]
+    pattern_type = params[:pattern_type] || "exact"
+    description = params[:description]
+
+    # Validate domain format
+    unless mx_domain.match?(/\A[a-zA-Z0-9.*-]{1,255}\z/)
+      respond_to do |wants|
+        wants.json do
+          render json: { error: "Invalid domain format" }, status: :unprocessable_entity
+        end
+      end
+      return
+    end
+
+    # Validate pattern type
+    unless MXRateLimitWhitelist::PATTERN_TYPES.values.include?(pattern_type)
+      respond_to do |wants|
+        wants.json do
+          render json: { error: "Invalid pattern type" }, status: :unprocessable_entity
+        end
+      end
+      return
+    end
+
+    whitelist = @server.mx_rate_limit_whitelists.build(
+      mx_domain: mx_domain,
+      pattern_type: pattern_type,
+      description: description,
+      created_by: current_user
+    )
+
+    if whitelist.save
+      respond_to do |wants|
+        wants.json do
+          render json: {
+            whitelist: {
+              id: whitelist.id,
+              mx_domain: whitelist.mx_domain,
+              pattern_type: whitelist.pattern_type,
+              description: whitelist.description,
+              created_by: whitelist.created_by&.email,
+              created_at: whitelist.created_at
+            }
+          }, status: :created
+        end
+      end
+    else
+      respond_to do |wants|
+        wants.json do
+          render json: { error: whitelist.errors.full_messages.join(", ") }, status: :unprocessable_entity
+        end
+      end
+    end
+  end
+
+  def delete_whitelist
+    whitelist_id = params[:id]
+    whitelist = @server.mx_rate_limit_whitelists.find_by(id: whitelist_id)
+
+    if whitelist.nil?
+      respond_to do |wants|
+        wants.json do
+          render json: { error: "Whitelist entry not found" }, status: :not_found
+        end
+      end
+      return
+    end
+
+    whitelist.destroy
+
+    respond_to do |wants|
+      wants.json do
+        render json: { message: "Whitelist entry deleted" }, status: :ok
+      end
+    end
+  end
+
   def summary
     active_count = @server.mx_rate_limits.active.count
     total_count = @server.mx_rate_limits.count

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_01_26_000006) do
+ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -217,6 +217,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000006) do
     t.index ["priority"], name: "index_mx_rate_limit_patterns_on_priority"
   end
 
+  create_table "mx_rate_limit_whitelists", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
+    t.integer "server_id", null: false
+    t.string "mx_domain", null: false, comment: "Whitelisted MX domain (e.g., mail.example.com)"
+    t.string "pattern_type", default: "exact", null: false, comment: "exact, prefix, or regex"
+    t.text "description", comment: "Why this domain is whitelisted"
+    t.integer "created_by_id", comment: "User who created the whitelist entry"
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.index ["created_by_id"], name: "fk_rails_680cf527f5"
+    t.index ["server_id", "mx_domain"], name: "index_whitelist_on_server_and_mx", unique: true
+    t.index ["server_id"], name: "index_whitelist_on_server"
+  end
+
   create_table "mx_rate_limits", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "server_id", null: false
     t.string "mx_domain", null: false
@@ -229,9 +242,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000006) do
     t.integer "max_attempts", default: 10
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
+    t.boolean "whitelisted", default: false, comment: "Skip rate limiting for this MX domain"
     t.index ["current_delay"], name: "index_mx_rate_limits_on_current_delay"
     t.index ["last_error_at"], name: "index_mx_rate_limits_on_last_error_at"
     t.index ["server_id", "mx_domain"], name: "index_mx_rate_limits_on_server_and_mx", unique: true
+    t.index ["server_id", "whitelisted"], name: "index_mx_rate_limits_whitelisted"
   end
 
   create_table "organization_ip_pools", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
@@ -470,5 +485,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000006) do
   end
 
   add_foreign_key "mx_rate_limit_events", "servers"
+  add_foreign_key "mx_rate_limit_whitelists", "servers"
+  add_foreign_key "mx_rate_limit_whitelists", "users", column: "created_by_id"
   add_foreign_key "mx_rate_limits", "servers"
 end

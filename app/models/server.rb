@@ -66,6 +66,7 @@ class Server < ApplicationRecord
   has_many :domain_throttles, dependent: :delete_all
   has_many :mx_rate_limits, dependent: :delete_all
   has_many :mx_rate_limit_events, dependent: :delete_all
+  has_many :mx_rate_limit_whitelists, dependent: :delete_all
   has_many :webhooks, dependent: :destroy
   has_many :webhook_requests, dependent: :destroy
   has_many :track_domains, dependent: :destroy
