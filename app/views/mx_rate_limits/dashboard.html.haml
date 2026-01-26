@@ -149,7 +149,9 @@
             %dd= "#{Postal::Config.postal.mx_rate_limiting_recovery_threshold} consecutive successes"
 
             %dt Delay Decrement
-            %dd= "#{Postal::Config.postal.mx_rate_limiting_delay_decrement}s per recovery"
+            %dd
+              = "#{Postal::Config.postal.mx_rate_limiting_delay_decrement}s"
+              %span per recovery
 
   - else
     .suspensionBox.u-margin
