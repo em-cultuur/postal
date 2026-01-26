@@ -140,16 +140,16 @@
                 = Postal::Config.postal.mx_rate_limiting_shadow_mode ? "Yes (Log Only)" : "No (Enforced)"
 
             %dt Delay Increment
-            %dd= "#{Postal::Config.postal.mx_rate_limiting_delay_increment}s (#{(Postal::Config.postal.mx_rate_limiting_delay_increment / 60).round}m)"
+            %dd= format_delay_human(Postal::Config.postal.mx_rate_limiting_delay_increment)
 
             %dt Max Delay
-            %dd= "#{Postal::Config.postal.mx_rate_limiting_max_delay}s (#{(Postal::Config.postal.mx_rate_limiting_max_delay / 60).round}m)"
+            %dd= format_delay_human(Postal::Config.postal.mx_rate_limiting_max_delay)
 
             %dt Recovery Threshold
             %dd= "#{Postal::Config.postal.mx_rate_limiting_recovery_threshold} consecutive successes"
 
             %dt Delay Decrement
-            %dd= "#{Postal::Config.postal.mx_rate_limiting_delay_decrement}s per recovery"
+            %dd= format_delay_human(Postal::Config.postal.mx_rate_limiting_delay_decrement)
 
   - else
     .suspensionBox.u-margin
