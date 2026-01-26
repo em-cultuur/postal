@@ -21,7 +21,7 @@ RSpec.describe "Database Schema Integrity" do
 
       # Verifica che corrispondano
       expect(schema_version).to eq(latest_migration_version),
-                                   "Schema version (#{schema_version}) should match the latest migration (#{latest_migration_version})"
+                                "Schema version (#{schema_version}) should match the latest migration (#{latest_migration_version})"
     end
   end
 
@@ -29,8 +29,8 @@ RSpec.describe "Database Schema Integrity" do
     it "contains the correct version number" do
       schema_content = File.read(Rails.root.join("db", "schema.rb"))
 
-      # Estrai la versione dal file schema.rb
-      schema_version_match = schema_content.match(/ActiveRecord::Schema\[[\d.]+\]\.define\(version: (\d+)\)/)
+      # Estrai la versione dal file schema.rb (supporta versioni con underscore come 2026_01_26_000006)
+      schema_version_match = schema_content.match(/ActiveRecord::Schema\[[\d.]+\]\.define\(version: (\d+(?:_\d+)*)\)/)
       expect(schema_version_match).not_to be_nil, "Could not find schema version in db/schema.rb"
 
       schema_file_version = schema_version_match[1].to_i
@@ -42,7 +42,7 @@ RSpec.describe "Database Schema Integrity" do
 
       # Verifica che corrispondano
       expect(schema_file_version).to eq(latest_migration_version),
-                                        "Schema file version (#{schema_file_version}) should match the latest migration (#{latest_migration_version})"
+                                     "Schema file version (#{schema_file_version}) should match the latest migration (#{latest_migration_version})"
     end
   end
 
@@ -101,8 +101,7 @@ RSpec.describe "Database Schema Integrity" do
       missing_migrations = migration_versions.map(&:to_i) - applied_migrations.map(&:to_i)
 
       expect(missing_migrations).to be_empty,
-                                      "The following migrations have not been applied: #{missing_migrations.join(', ')}"
+                                    "The following migrations have not been applied: #{missing_migrations.join(', ')}"
     end
   end
 end
-
