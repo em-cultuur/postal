@@ -306,6 +306,7 @@ module MessageDequeuer
       # Log throttled event
       rate_limit.events.create!(
         server_id: queued_message.server_id,
+        mx_domain: rate_limit.mx_domain,
         recipient_domain: queued_message.domain,
         event_type: "throttled",
         delay_before: rate_limit.current_delay,
