@@ -76,14 +76,14 @@ class MXRateLimitPattern < ApplicationRecord
       },
       {
         name: "Temporarily Rejected",
-        pattern: '\b(temporarily rejected|temporarily deferred)\b.*\b(rate|limit)\b',
+        pattern: '\b(temporarily rejected|temporarily deferred)\b[^\n]*\b(rate|limit)\b',
         action: "rate_limit",
         priority: 60,
         suggested_delay: 300
       },
       {
         name: "Permanent Block",
-        pattern: '\b5[0-9]{2}\b.*\b(blocked|blacklisted|banned)\b',
+        pattern: '\b5\d{2}\b[^\n]*\b(blocked|blacklisted|banned)\b',
         action: "hard_fail",
         priority: 50
       },
