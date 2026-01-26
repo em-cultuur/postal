@@ -218,14 +218,15 @@
 
 // Configuration Info
 .mxRateLimitingDashboard__info {
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: #fff;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  padding: 0;
+  padding: 20px;
+  overflow: hidden;
 }
 
 .mxRateLimitingDashboard__configTable {
-  padding: 20px;
+  margin: 0;
 
   dl {
     display: grid;
