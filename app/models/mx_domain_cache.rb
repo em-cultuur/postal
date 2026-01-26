@@ -5,13 +5,13 @@
 # Table name: mx_domain_cache
 #
 #  id               :integer          not null, primary key
-#  recipient_domain :string(255)      not null
-#  mx_domain        :string(255)      not null
-#  mx_records       :text
-#  resolved_at      :datetime         not null
 #  expires_at       :datetime         not null
-#  created_at       :datetime
-#  updated_at       :datetime
+#  mx_domain        :string(255)      not null
+#  mx_records       :text(65535)
+#  recipient_domain :string(255)      not null
+#  resolved_at      :datetime         not null
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
 #
 # Indexes
 #

@@ -22,6 +22,9 @@
 require "rails_helper"
 
 RSpec.describe MXRateLimitPattern do
+  # Clear default patterns that are created by migrations
+  before(:all) { MXRateLimitPattern.delete_all }
+
   describe "validations" do
     it "requires a name" do
       pattern = MXRateLimitPattern.new(pattern: '\b421\b', action: "rate_limit")
@@ -85,6 +88,8 @@ RSpec.describe MXRateLimitPattern do
   end
 
   describe ".create_defaults!" do
+    before { MXRateLimitPattern.delete_all }
+
     it "creates all default patterns" do
       expect do
         MXRateLimitPattern.create_defaults!
