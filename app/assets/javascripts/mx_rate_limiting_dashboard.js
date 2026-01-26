@@ -1,10 +1,10 @@
 // frozen_string_literal: true
 
 document.addEventListener('turbolinks:load', function() {
-  const chartContainer = document.getElementById('mxRateLimitingChart');
+  var chartContainer = document.getElementById('mxRateLimitingChart');
   
   if (chartContainer && window.Chartist) {
-    const chartData = JSON.parse(chartContainer.dataset.chartData || '{}');
+    var chartData = JSON.parse(chartContainer.dataset.chartData || '{}');
     
     if (chartData.labels && chartData.labels.length > 0) {
       new Chartist.Line('#mxRateLimitingChart', {
@@ -28,7 +28,7 @@ document.addEventListener('turbolinks:load', function() {
       });
       
       // Add legend
-      const legend = document.querySelector('.mxRateLimitingDashboard__chartLegend');
+      var legend = document.querySelector('.mxRateLimitingDashboard__chartLegend');
       if (legend) {
         legend.style.display = 'flex';
       }
@@ -39,7 +39,7 @@ document.addEventListener('turbolinks:load', function() {
   document.querySelectorAll('.js-view-details').forEach(function(link) {
     link.addEventListener('click', function(e) {
       e.preventDefault();
-      const mxDomain = this.dataset.mxDomain;
+      var mxDomain = this.dataset.mxDomain;
       // Implement modal or redirect to details page
       console.log('View details for:', mxDomain);
     });
