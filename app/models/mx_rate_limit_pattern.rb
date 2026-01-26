@@ -104,7 +104,16 @@ class MXRateLimitPattern < ApplicationRecord
     return false if smtp_message.blank? || pattern.blank?
 
     regex = Regexp.new(pattern, Regexp::IGNORECASE)
-    regex.match?(smtp_message)
+
+    # Add timeout protection against ReDoS (Regular Expression Denial of Service)
+    begin
+      Timeout.timeout(0.1) do
+        regex.match?(smtp_message)
+      end
+    rescue Timeout::Error
+      Rails.logger.warn("Pattern matching timeout for pattern '#{pattern}' - possible ReDoS attack")
+      false
+    end
   rescue RegexpError => e
     Rails.logger.error("Invalid regex pattern '#{pattern}': #{e.message}")
     false

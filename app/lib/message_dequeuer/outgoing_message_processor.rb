@@ -345,7 +345,7 @@ module MessageDequeuer
     end
 
     def apply_mx_rate_limit
-      rate_limit = MXRateLimit.find_or_initialize_by(
+      rate_limit = MXRateLimit.find_or_create_by!(
         server: queued_message.server,
         mx_domain: queued_message.mx_domain
       )
