@@ -6,9 +6,6 @@
   .pageHeader
     %h2.pageHeader__title
       MX Rate Limiting Dashboard
-      %label.mxRateLimitingDashboard__autoRefresh
-        %input#autoRefreshToggle{:type => "checkbox"}
-        %span Auto-refresh (30s)
 
   - if Postal::Config.postal.mx_rate_limiting_enabled
     .mxRateLimitingDashboard

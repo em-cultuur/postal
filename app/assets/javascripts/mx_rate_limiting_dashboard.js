@@ -35,42 +35,6 @@ document.addEventListener('turbolinks:load', function() {
     }
   }
 
-  // Auto-refresh functionality
-  const autoRefreshToggle = document.getElementById('autoRefreshToggle');
-  let autoRefreshInterval = null;
-
-  if (autoRefreshToggle) {
-    const savedAutoRefresh = localStorage.getItem('mxRateLimitingAutoRefresh');
-    if (savedAutoRefresh === 'true') {
-      autoRefreshToggle.checked = true;
-      startAutoRefresh();
-    }
-
-    autoRefreshToggle.addEventListener('change', function() {
-      if (this.checked) {
-        localStorage.setItem('mxRateLimitingAutoRefresh', 'true');
-        startAutoRefresh();
-      } else {
-        localStorage.setItem('mxRateLimitingAutoRefresh', 'false');
-        stopAutoRefresh();
-      }
-    });
-  }
-
-  function startAutoRefresh() {
-    // Refresh every 30 seconds
-    autoRefreshInterval = setInterval(function() {
-      location.reload();
-    }, 30000);
-  }
-
-  function stopAutoRefresh() {
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
-      autoRefreshInterval = null;
-    }
-  }
-
   // View MX details modal
   document.querySelectorAll('.js-view-details').forEach(function(link) {
     link.addEventListener('click', function(e) {
