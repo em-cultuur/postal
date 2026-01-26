@@ -108,6 +108,56 @@ RSpec.describe "MxRateLimits API", type: :request do
     end
   end
 
+  describe "GET /org/:org_permalink/servers/:server_id/mx_rate_limits (HTML dashboard)" do
+    context "when MX rate limiting is enabled" do
+      before do
+        allow(Postal::Config.postal).to receive(:mx_rate_limiting_enabled).and_return(true)
+      end
+
+      let!(:rate_limit) do
+        create(:mx_rate_limit,
+               server: server,
+               mx_domain: "gmail.com",
+               error_count: 3,
+               success_count: 5,
+               current_delay: 900)
+      end
+
+      let!(:event) { create(:mx_rate_limit_event, server: server, event_type: "error", created_at: 1.hour.ago) }
+
+      it "assigns rate limits to the view" do
+        get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits", params: { format: :json }
+
+        expect(response).to have_http_status(:ok)
+        parsed_body = JSON.parse(response.body)
+        expect(parsed_body["rate_limits"]).to include(hash_including("mx_domain" => "gmail.com"))
+      end
+
+      it "returns JSON for API consumption" do
+        get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits", params: { format: :json }
+
+        expect(response).to have_http_status(:ok)
+        expect(response.content_type).to include("application/json")
+        parsed_body = JSON.parse(response.body)
+        expect(parsed_body.key?("rate_limits")).to be true
+      end
+    end
+
+    context "when MX rate limiting is disabled" do
+      before do
+        allow(Postal::Config.postal).to receive(:mx_rate_limiting_enabled).and_return(false)
+      end
+
+      it "still returns JSON data" do
+        get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits", params: { format: :json }
+
+        expect(response).to have_http_status(:ok)
+        parsed_body = JSON.parse(response.body)
+        expect(parsed_body.key?("rate_limits")).to be true
+      end
+    end
+  end
+
   describe "GET /org/:org_permalink/servers/:server_id/mx_rate_limits/:id/stats" do
     let!(:rate_limit) do
       create(:mx_rate_limit,

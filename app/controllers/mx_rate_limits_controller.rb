@@ -10,7 +10,18 @@ class MXRateLimitsController < ApplicationController
     @rate_limits = @server.mx_rate_limits.active.includes(:events).order(current_delay: :desc)
 
     respond_to do |wants|
-      wants.html
+      wants.html do
+        # Load dashboard data for HTML view
+        @summary = {
+          active_count: @server.mx_rate_limits.active.count,
+          total_count: @server.mx_rate_limits.count,
+          max_delay: @server.mx_rate_limits.maximum(:current_delay) || 0,
+          avg_delay: @server.mx_rate_limits.average(:current_delay)&.round || 0
+        }
+        @recent_events = @server.mx_rate_limit_events.where("created_at > ?", 24.hours.ago).order(created_at: :desc).limit(50)
+        @events_chart_data = prepare_events_chart_data
+        render :dashboard
+      end
       wants.json do
         render json: {
           rate_limits: @rate_limits.map do |rl|
@@ -29,6 +40,11 @@ class MXRateLimitsController < ApplicationController
         }
       end
     end
+  end
+
+  def dashboard
+    # Legacy dashboard action - now handled by index
+    redirect_to organization_server_mx_rate_limits_path(@organization, @server)
   end
 
   def summary
@@ -93,5 +109,52 @@ class MXRateLimitsController < ApplicationController
       end
     end
   end
+
+  private
+
+  def prepare_events_chart_data
+    events = @server.mx_rate_limit_events.where("created_at > ?", 48.hours.ago).order(created_at: :asc)
+
+    hourly_data = {}
+    events.each do |event|
+      hour = event.created_at.beginning_of_hour
+      hourly_data[hour] ||= { errors: 0, successes: 0, delays: 0 }
+      case event.event_type
+      when "error"
+        hourly_data[hour][:errors] += 1
+      when "success"
+        hourly_data[hour][:successes] += 1
+      when "delay_increased", "delay_decreased"
+        hourly_data[hour][:delays] += 1
+      end
+    end
+
+    # Fill in missing hours
+    start_time = 48.hours.ago.beginning_of_hour
+    end_time = Time.current.beginning_of_hour
+    current_time = start_time
+
+    while current_time <= end_time
+      hourly_data[current_time] ||= { errors: 0, successes: 0, delays: 0 }
+      current_time += 1.hour
+    end
+
+    hourly_data.sort_by { |k, _| k }
+  end
+
+  def prepare_chart_json
+    chart_data = prepare_events_chart_data
+    labels = chart_data.map { |hour, _| hour.strftime("%l%P") }
+    errors = chart_data.map { |_, data| data[:errors] }
+    successes = chart_data.map { |_, data| data[:successes] }
+
+    {
+      labels: labels,
+      errors: errors,
+      successes: successes
+    }
+  end
+
+  helper_method :prepare_chart_json
 
 end

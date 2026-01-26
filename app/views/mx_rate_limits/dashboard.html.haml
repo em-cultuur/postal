@@ -1,0 +1,165 @@
+- page_title << "MX Rate Limiting Dashboard"
+= render 'servers/sidebar', :active_server => @server
+= render 'servers/header', :active_nav => :mx_rate_limits
+
+.pageContent
+  .pageHeader
+    %h2.pageHeader__title
+      MX Rate Limiting Dashboard
+      %label.mxRateLimitingDashboard__autoRefresh
+        %input#autoRefreshToggle{:type => "checkbox"}
+        %span Auto-refresh (30s)
+
+  - if Postal::Config.postal.mx_rate_limiting_enabled
+    .mxRateLimitingDashboard
+
+      / Summary Stats Section
+      .mxRateLimitingDashboard__summary
+        %h3.mxRateLimitingDashboard__sectionTitle Summary
+        .mxRateLimitingDashboard__stats
+          .mxRateLimitingDashboard__stat
+            %dt.mxRateLimitingDashboard__statLabel Active Rate Limits
+            %dd.mxRateLimitingDashboard__statValue= @summary[:active_count]
+
+          .mxRateLimitingDashboard__stat
+            %dt.mxRateLimitingDashboard__statLabel Total Rate Limits
+            %dd.mxRateLimitingDashboard__statValue= @summary[:total_count]
+
+          .mxRateLimitingDashboard__stat
+            %dt.mxRateLimitingDashboard__statLabel Max Delay
+            %dd.mxRateLimitingDashboard__statValue= number_to_human_size(@summary[:max_delay], units: { each: "" }).gsub("B", "") + "s"
+
+          .mxRateLimitingDashboard__stat
+            %dt.mxRateLimitingDashboard__statLabel Avg Delay
+            %dd.mxRateLimitingDashboard__statValue= number_to_human_size(@summary[:avg_delay], units: { each: "" }).gsub("B", "") + "s"
+
+      / Events Chart Section
+      - if @recent_events.any?
+        .mxRateLimitingDashboard__section.u-margin
+          %h3.mxRateLimitingDashboard__sectionTitle Events (Last 48 Hours)
+          .mxRateLimitingDashboard__chartLegend.is-hidden
+            %span.mxRateLimitingDashboard__chartLegendItem
+              %i.mxRateLimitingDashboard__chartLegendColor{:style => "background-color: #d52b1e"}
+              Errors
+            %span.mxRateLimitingDashboard__chartLegendItem
+              %i.mxRateLimitingDashboard__chartLegendColor{:style => "background-color: #68a357"}
+              Successes
+          #mxRateLimitingChart.ct-chart{:data => {:chart_data => prepare_chart_json.to_json}}
+
+      / Active Rate Limits Section
+      - if @rate_limits.empty?
+        .noData.u-margin
+          %p.noData__title No active MX rate limits
+          %p.noData__text
+            Your mail server doesn't currently have any MX rate limits active.
+            Rate limits are automatically created when mail servers respond with rate limiting errors (421, 450, 451).
+      - else
+        .mxRateLimitingDashboard__section.u-margin
+          %h3.mxRateLimitingDashboard__sectionTitle Active MX Rate Limits
+          %table.dataTable
+            %thead
+              %tr
+                %th MX Domain
+                %th Current Delay
+                %th Error Count
+                %th Success Count
+                %th Last Error
+                %th Status
+                %th Actions
+            %tbody
+              - for rate_limit in @rate_limits
+                %tr{:class => "#{rate_limit.current_delay > 0 ? 'mxRateLimitingDashboard__activeRow' : ''}"}
+                  %td
+                    %code= rate_limit.mx_domain
+                  %td.dataTable__rightCell
+                    %span.mxRateLimitingDashboard__delayBadge{:class => "#{rate_limit.current_delay > 1800 ? 'is-critical' : rate_limit.current_delay > 600 ? 'is-warning' : 'is-normal'}"}
+                      = "#{rate_limit.current_delay}s"
+                  %td.dataTable__centerCell= rate_limit.error_count
+                  %td.dataTable__centerCell= rate_limit.success_count
+                  %td.dataTable__centerCell
+                    - if rate_limit.last_error_at
+                      %span.mxRateLimitingDashboard__timestamp{:title => rate_limit.last_error_at.to_s}
+                        = time_ago_in_words(rate_limit.last_error_at)
+                        ago
+                    - else
+                      %span.mxRateLimitingDashboard__noData --
+                  %td.dataTable__centerCell
+                    - if rate_limit.current_delay > 0
+                      %span.label.label--warning Throttled
+                    - else
+                      %span.label.label--success Healthy
+                  %td.dataTable__centerCell
+                    %a.mxRateLimitingDashboard__viewLink{:href => "#", "data-mx-domain" => rate_limit.mx_domain, :class => "js-view-details"}
+                      View Details
+
+      / Recent Events Section
+      - if @recent_events.empty?
+        .mxRateLimitingDashboard__section.u-margin
+          %h3.mxRateLimitingDashboard__sectionTitle Recent Events (Last 24 Hours)
+          .noData
+            %p.noData__title No events in the last 24 hours
+            %p.noData__text
+              Check back later or view the rate limiting status in the table above.
+      - else
+        .mxRateLimitingDashboard__section.u-margin
+          %h3.mxRateLimitingDashboard__sectionTitle Recent Events (Last 24 Hours)
+          %table.dataTable.mxRateLimitingDashboard__eventTable
+            %thead
+              %tr
+                %th Time
+                %th Event Type
+                %th MX Domain
+                %th SMTP Response
+            %tbody
+              - for event in @recent_events.limit(20)
+                %tr{:class => "#{event.event_type == 'error' ? 'mxRateLimitingDashboard__errorRow' : ''}"}
+                  %td.dataTable__rightCell
+                    %span.mxRateLimitingDashboard__timestamp{:title => event.created_at.to_s}
+                      = event.created_at.strftime("%l:%M %p")
+                  %td
+                    %span.mxRateLimitingDashboard__eventBadge{:class => "event-#{event.event_type}"}
+                      = event.event_type.titleize
+                  %td
+                    %code= event.mx_domain
+                  %td
+                    - if event.smtp_response.present?
+                      %code= event.smtp_response.truncate(50)
+                    - else
+                      %span.mxRateLimitingDashboard__noData --
+
+      / Configuration Info
+      .mxRateLimitingDashboard__info.u-margin
+        %h3.mxRateLimitingDashboard__sectionTitle Configuration
+        .mxRateLimitingDashboard__configTable
+          %dl
+            %dt Enabled
+            %dd
+              %span.label{:class => "label--#{Postal::Config.postal.mx_rate_limiting_enabled ? 'success' : 'danger'}"}
+                = Postal::Config.postal.mx_rate_limiting_enabled ? "Yes" : "No"
+
+            %dt Shadow Mode
+            %dd
+              %span.label{:class => "label--#{Postal::Config.postal.mx_rate_limiting_shadow_mode ? 'warning' : 'success'}"}
+                = Postal::Config.postal.mx_rate_limiting_shadow_mode ? "Yes (Log Only)" : "No (Enforced)"
+
+            %dt Delay Increment
+            %dd= "#{Postal::Config.postal.mx_rate_limiting_delay_increment}s (#{(Postal::Config.postal.mx_rate_limiting_delay_increment / 60).round}m)"
+
+            %dt Max Delay
+            %dd= "#{Postal::Config.postal.mx_rate_limiting_max_delay}s (#{(Postal::Config.postal.mx_rate_limiting_max_delay / 60).round}m)"
+
+            %dt Recovery Threshold
+            %dd= "#{Postal::Config.postal.mx_rate_limiting_recovery_threshold} consecutive successes"
+
+            %dt Delay Decrement
+            %dd= "#{Postal::Config.postal.mx_rate_limiting_delay_decrement}s per recovery"
+
+  - else
+    .suspensionBox.u-margin
+      %p
+        MX Rate Limiting is currently disabled for this server.
+        To enable it, set <code>mx_rate_limiting_enabled: true</code> in your Postal configuration.
+      %p
+        When enabled, the system will automatically detect and handle rate limiting responses from mail servers
+        using linear backoff and gradual recovery strategies.
+

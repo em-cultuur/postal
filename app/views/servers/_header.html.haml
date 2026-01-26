@@ -57,5 +57,6 @@
     %li.navBar__item= link_to "Routing", [organization, @server, :routes], :class => ['navBar__link', active_nav == :routing ? 'is-active' : '']
     %li.navBar__item= link_to "Credentials", [organization, @server, :credentials], :class => ['navBar__link', active_nav == :credentials ? 'is-active' : '']
     %li.navBar__item= link_to "Webhooks", [organization, @server, :webhooks], :class => ['navBar__link', active_nav == :webhooks ? 'is-active' : '']
+    %li.navBar__item= link_to "MX Rate Limits", [organization, @server, :mx_rate_limits], :class => ['navBar__link', active_nav == :mx_rate_limits ? 'is-active' : '']
     %li.navBar__item= link_to "Settings", [:edit, organization, @server], :class => ['navBar__link', active_nav == :settings ? 'is-active' : '']
     %li.navBar__item.navBar__item--end= link_to "Help", [organization, @server, :help_outgoing], :class => ['navBar__link', active_nav == :help ? 'is-active' : '']

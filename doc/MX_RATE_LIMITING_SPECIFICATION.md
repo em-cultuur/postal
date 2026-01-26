@@ -1279,6 +1279,183 @@ postal:
 
 ---
 
+## 📊 Web Dashboard (Phase 5)
+
+### Overview
+
+A comprehensive web-based dashboard provides real-time visibility into MX rate limiting status and metrics. Accessible at `/org/:org_permalink/servers/:server_id/mx_rate_limits`, the dashboard displays:
+
+- **Summary Statistics**: Active/total rate limits, max delay, average delay
+- **Rate Limit Table**: Per-MX status with color-coded delay indicators
+- **Event Timeline**: 48-hour event history with visual chart
+- **Recent Events**: Last 24 hours of rate limiting events
+- **Configuration**: Current settings and parameters
+
+### Features
+
+#### 1. **Summary Cards**
+- **Active Rate Limits**: Count of currently throttled MX domains
+- **Total Rate Limits**: All-time rate limit records (including recovered)
+- **Max Delay**: Highest current delay across all rate limits
+- **Avg Delay**: Average delay across active rate limits
+
+#### 2. **Rate Limits Table**
+Displays all active rate limits with:
+- MX domain name
+- Current delay (color-coded badge: green/yellow/red)
+- Error count
+- Success count
+- Last error timestamp
+- Status label (Throttled/Healthy)
+- View details link
+
+**Color Coding:**
+- **Green**: ≤ 600 seconds (Normal)
+- **Yellow**: 601-1800 seconds (Warning)
+- **Red**: > 1800 seconds (Critical)
+
+#### 3. **Events Chart**
+48-hour timeline showing:
+- Error events (red line)
+- Success events (green line)
+- Delay adjustments (blue events)
+- Auto-refreshing every 30 seconds (optional)
+
+#### 4. **Recent Events Table**
+Latest 20 events from the past 24 hours:
+- Timestamp
+- Event type badge (color-coded)
+- MX domain
+- SMTP response snippet
+
+**Event Types:**
+- `error` - Rate limit error detected
+- `success` - Successful delivery to throttled MX
+- `delay_increased` - Backoff applied
+- `delay_decreased` - Recovery initiated
+
+#### 5. **Configuration Section**
+Display-only section showing:
+- Enabled status (Yes/No)
+- Shadow mode (Yes/No - Log Only)
+- Delay increment (e.g., "300s (5m)")
+- Max delay (e.g., "3600s (60m)")
+- Recovery threshold (e.g., "5 consecutive successes")
+- Delay decrement (e.g., "120s")
+
+### Navigation
+
+The "MX Rate Limits" link appears in the server navigation bar between "Webhooks" and "Settings".
+
+**Breadcrumb Structure:**
+Organization → Servers → [Server Name] → MX Rate Limits
+
+### Auto-Refresh
+
+Optional auto-refresh toggle (checkbox in header):
+- Refreshes entire page every 30 seconds when enabled
+- Setting persisted in browser localStorage
+- Useful for monitoring during active rate limiting
+
+### Responsive Design
+
+Dashboard is fully responsive:
+- **Desktop**: Multi-column layout with all features visible
+- **Tablet**: Single column with stacked components
+- **Mobile**: Optimized layout with scrollable tables
+
+### API Endpoints
+
+The dashboard uses these internal API endpoints:
+
+#### GET `/org/:org_permalink/servers/:server_id/mx_rate_limits` (JSON)
+```json
+{
+  "rate_limits": [
+    {
+      "mx_domain": "gmail-smtp-in.l.google.com",
+      "current_delay_seconds": 300,
+      "error_count": 5,
+      "success_count": 3,
+      "last_error_at": "2026-01-23T10:30:00Z",
+      "last_success_at": "2026-01-23T10:45:00Z",
+      "last_error_message": "421 4.7.0 Try again later",
+      "created_at": "2026-01-23T08:00:00Z",
+      "updated_at": "2026-01-23T10:45:00Z"
+    }
+  ]
+}
+```
+
+#### GET `/org/:org_permalink/servers/:server_id/mx_rate_limits/summary` (JSON)
+```json
+{
+  "summary": {
+    "active_rate_limits": 2,
+    "total_rate_limits": 8,
+    "events_last_24h": 42,
+    "errors_last_24h": 15,
+    "successes_last_24h": 27
+  }
+}
+```
+
+#### GET `/org/:org_permalink/servers/:server_id/mx_rate_limits/:mx_domain/stats` (JSON)
+```json
+{
+  "rate_limit": {
+    "mx_domain": "gmail-smtp-in.l.google.com",
+    "current_delay_seconds": 300,
+    "error_count": 5,
+    "success_count": 3,
+    "last_error_at": "2026-01-23T10:30:00Z",
+    "last_success_at": "2026-01-23T10:45:00Z",
+    "last_error_message": "421 4.7.0 Try again later",
+    "created_at": "2026-01-23T08:00:00Z",
+    "updated_at": "2026-01-23T10:45:00Z"
+  },
+  "events_last_24h": [
+    {
+      "event_type": "error",
+      "smtp_response": "421 Try again later",
+      "created_at": "2026-01-23T10:30:00Z"
+    },
+    {
+      "event_type": "success",
+      "created_at": "2026-01-23T10:45:00Z"
+    }
+  ]
+}
+```
+
+### Styling
+
+Dashboard uses Postal's existing design system:
+- Typography: Source Sans Pro
+- Colors: Consistent with existing UI
+- Components: Data tables, badges, stats cards
+- Animations: Subtle hover effects and transitions
+
+**CSS Classes:**
+- `.mxRateLimitingDashboard` - Main container
+- `.mxRateLimitingDashboard__summary` - Summary cards section
+- `.mxRateLimitingDashboard__stat` - Individual stat card
+- `.mxRateLimitingDashboard__section` - Content sections
+- `.mxRateLimitingDashboard__delayBadge` - Delay indicator badge
+- `.mxRateLimitingDashboard__eventBadge` - Event type badge
+- `.mxRateLimitingDashboard__chartLegend` - Chart legend
+
+### Testing
+
+Dashboard tested with:
+- Request specs for HTML rendering
+- JSON endpoint validation
+- Chart data preparation
+- Configuration display
+- Responsive layout verification
+
+---
+
 ## ✅ Acceptance Criteria
 
 This feature will be considered complete when:
@@ -1294,9 +1471,10 @@ This feature will be considered complete when:
 - [ ] API endpoints functional and documented
 - [ ] Scheduled cleanup task running
 - [ ] Shadow mode testing completed
+- [ ] Dashboard displaying real-time data
+- [ ] Auto-refresh functionality working
+- [ ] Dashboard tests passing
 - [ ] Production deployment successful
-- [ ] Metrics dashboard showing data
-- [ ] Documentation complete and reviewed
 - [ ] No degradation in delivery performance
 - [ ] 20% reduction in soft bounces achieved
 

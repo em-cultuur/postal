@@ -1,0 +1,83 @@
+// frozen_string_literal: true
+
+document.addEventListener('turbolinks:load', function() {
+  const chartContainer = document.getElementById('mxRateLimitingChart');
+  
+  if (chartContainer && window.Chartist) {
+    const chartData = JSON.parse(chartContainer.dataset.chartData || '{}');
+    
+    if (chartData.labels && chartData.labels.length > 0) {
+      new Chartist.Line('#mxRateLimitingChart', {
+        labels: chartData.labels,
+        series: [
+          chartData.errors || [],
+          chartData.successes || []
+        ]
+      }, {
+        lineSmooth: Chartist.Interpolation.simple({
+          divisor: 2
+        }),
+        fullWidth: true,
+        chartPadding: {
+          top: 15,
+          right: 10,
+          bottom: 5,
+          left: 60
+        },
+        height: '300px'
+      });
+      
+      // Add legend
+      const legend = document.querySelector('.mxRateLimitingDashboard__chartLegend');
+      if (legend) {
+        legend.style.display = 'flex';
+      }
+    }
+  }
+
+  // Auto-refresh functionality
+  const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+  let autoRefreshInterval = null;
+
+  if (autoRefreshToggle) {
+    const savedAutoRefresh = localStorage.getItem('mxRateLimitingAutoRefresh');
+    if (savedAutoRefresh === 'true') {
+      autoRefreshToggle.checked = true;
+      startAutoRefresh();
+    }
+
+    autoRefreshToggle.addEventListener('change', function() {
+      if (this.checked) {
+        localStorage.setItem('mxRateLimitingAutoRefresh', 'true');
+        startAutoRefresh();
+      } else {
+        localStorage.setItem('mxRateLimitingAutoRefresh', 'false');
+        stopAutoRefresh();
+      }
+    });
+  }
+
+  function startAutoRefresh() {
+    // Refresh every 30 seconds
+    autoRefreshInterval = setInterval(function() {
+      location.reload();
+    }, 30000);
+  }
+
+  function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  }
+
+  // View MX details modal
+  document.querySelectorAll('.js-view-details').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      const mxDomain = this.dataset.mxDomain;
+      // Implement modal or redirect to details page
+      console.log('View details for:', mxDomain);
+    });
+  });
+});
