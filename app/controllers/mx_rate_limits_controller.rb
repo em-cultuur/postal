@@ -77,7 +77,7 @@ class MXRateLimitsController < ApplicationController
     unless mx_domain.match?(/\A[a-zA-Z0-9.-]{1,255}\z/)
       respond_to do |wants|
         wants.json do
-          render json: { error: "Invalid MX domain format" }, status: :unprocessable_entity
+          render json: { error: "Invalid request" }, status: :unprocessable_entity
         end
       end
       return
@@ -88,7 +88,7 @@ class MXRateLimitsController < ApplicationController
     if rate_limit.nil?
       respond_to do |wants|
         wants.json do
-          render json: { error: "Rate limit not found for MX domain: #{mx_domain}" }, status: :not_found
+          render json: { error: "Not found" }, status: :not_found
         end
       end
       return
@@ -132,14 +132,14 @@ class MXRateLimitsController < ApplicationController
     org_user = organization.users.joins(:organization_users).where("users.id = ?", current_user.id).first
 
     if org_user.nil?
-      raise ActiveRecord::RecordNotFound, "Organization not found"
+      raise ActiveRecord::RecordNotFound
     end
 
     # Check if user can access all servers or this specific server
     org_user_rel = current_user.organization_users.find_by(organization: organization)
     return if org_user_rel.all_servers? || org_user_rel.servers.include?(@server)
 
-    raise ActiveRecord::RecordNotFound, "Server access denied"
+    raise ActiveRecord::RecordNotFound
   end
 
   # Sanitize SMTP responses to prevent infrastructure disclosure
