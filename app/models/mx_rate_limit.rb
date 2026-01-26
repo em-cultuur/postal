@@ -30,6 +30,12 @@
 
 class MXRateLimit < ApplicationRecord
 
+  # Maximum length for error messages stored in last_error_message field (matches DB column length)
+  MAX_ERROR_MESSAGE_LENGTH = 255
+
+  # Maximum length for SMTP responses stored in events (text field allows 65535 but truncate for consistency)
+  MAX_SMTP_RESPONSE_LENGTH = 512
+
   belongs_to :server
 
   has_many :events,
@@ -114,7 +120,7 @@ class MXRateLimit < ApplicationRecord
         success_count: 0,
         current_delay: [current_delay + delay_inc, max_delay_val].min,
         last_error_at: Time.current,
-        last_error_message: smtp_response.to_s.truncate(255)
+        last_error_message: smtp_response.to_s.truncate(MAX_ERROR_MESSAGE_LENGTH)
       )
 
       # Log event
@@ -127,7 +133,7 @@ class MXRateLimit < ApplicationRecord
         delay_after: current_delay,
         error_count: error_count,
         success_count: success_count,
-        smtp_response: smtp_response.to_s.truncate(512),
+        smtp_response: smtp_response.to_s.truncate(MAX_SMTP_RESPONSE_LENGTH),
         matched_pattern: pattern,
         queued_message_id: queued_message&.id
       )
