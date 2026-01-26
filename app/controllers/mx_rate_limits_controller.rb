@@ -71,6 +71,17 @@ class MXRateLimitsController < ApplicationController
 
   def stats
     mx_domain = params[:id]
+
+    # Validate domain format to prevent injection attacks
+    unless mx_domain.match?(/\A[a-zA-Z0-9.-]{1,255}\z/)
+      respond_to do |wants|
+        wants.json do
+          render json: { error: "Invalid MX domain format" }, status: :unprocessable_entity
+        end
+      end
+      return
+    end
+
     rate_limit = @server.mx_rate_limits.find_by(mx_domain: mx_domain)
 
     if rate_limit.nil?

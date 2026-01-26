@@ -58,18 +58,46 @@ RSpec.describe "MxRateLimits API", type: :request do
         gmail_limit = parsed_body["rate_limits"].find { |rl| rl["mx_domain"] == "gmail.com" }
         expect(gmail_limit["error_count"]).to eq(3)
         expect(gmail_limit["current_delay_seconds"]).to eq(900)
-      end
-    end
+       end
+     end
 
-    context "when there are no active rate limits" do
-      it "returns an empty array" do
-        get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits.json"
+     context "when domain parameter is invalid" do
+       it "rejects domain with invalid characters" do
+         get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits/invalid<script>.com/stats", params: { format: :json }
 
-        expect(response).to have_http_status(:ok)
-        parsed_body = JSON.parse(response.body)
+         expect(response).to have_http_status(:unprocessable_entity)
+         parsed_body = JSON.parse(response.body)
+         expect(parsed_body["error"]).to match(/Invalid MX domain format/)
+       end
 
-        expect(parsed_body["rate_limits"]).to eq([])
-      end
+       it "rejects domain that is too long" do
+         long_domain = "a" * 256 + ".com"
+         get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits/#{long_domain}/stats", params: { format: :json }
+
+         expect(response).to have_http_status(:unprocessable_entity)
+         parsed_body = JSON.parse(response.body)
+         expect(parsed_body["error"]).to match(/Invalid MX domain format/)
+       end
+
+       it "rejects domain with SQL injection attempt" do
+         get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits/gmail.com'; DROP TABLE--/stats", params: { format: :json }
+
+         expect(response).to have_http_status(:unprocessable_entity)
+         parsed_body = JSON.parse(response.body)
+         expect(parsed_body["error"]).to match(/Invalid MX domain format/)
+       end
+
+       it "accepts valid domains with hyphens and dots" do
+         rate_limit = create(:mx_rate_limit, server: server, mx_domain: "mail-server.example-domain.com")
+
+         get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits/mail-server.example-domain.com/stats", params: { format: :json }
+
+         expect(response).to have_http_status(:ok)
+         parsed_body = JSON.parse(response.body)
+         expect(parsed_body["rate_limit"]["mx_domain"]).to eq("mail-server.example-domain.com")
+       end
+     end
+   end
     end
   end
 
