@@ -44,6 +44,9 @@ module Postal
     # - TrackingMiddleware needs to run early in the stack to capture all requests
     config.middleware.insert_before ActionDispatch::RequestId, TrackingMiddleware
 
+    # Add Rack::Attack middleware for rate limiting
+    config.middleware.insert_before ActionDispatch::RequestId, Rack::Attack
+
     config.hosts << Postal::Config.postal.web_hostname
     # Allow mta-sts subdomains for MTA-STS policy serving
     config.hosts << /\Amta-sts\./i

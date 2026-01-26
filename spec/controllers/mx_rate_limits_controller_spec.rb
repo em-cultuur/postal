@@ -263,6 +263,77 @@ RSpec.describe "MxRateLimits API", type: :request do
         end.to raise_error(ActiveRecord::RecordNotFound)
       end
     end
+
+    context "when user is not a member of the organization" do
+      before do
+        # Make sure the current user is NOT a member of other_organization
+        OrganizationUser.where(organization: other_organization, user: user).delete_all
+      end
+
+      it "returns 404 for rate limits list" do
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+
+      it "returns 404 for rate limit stats" do
+        create(:mx_rate_limit, server: other_server, mx_domain: "gmail.com")
+
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits/gmail.com/stats.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+    end
+  end
+
+  describe "API Rate Limiting" do
+    let(:user) { create(:user) }
+    let(:organization) { create(:organization, owner: user) }
+    let(:server) { create(:server, organization: organization) }
+
+    before do
+      OrganizationUser.create!(organization: organization, user: user, admin: true, all_servers: true)
+      allow_any_instance_of(ApplicationController).to receive(:login_required).and_return(true)
+      allow_any_instance_of(ApplicationController).to receive(:logged_in?).and_return(true)
+      allow_any_instance_of(ApplicationController).to receive(:current_user).and_return(user)
+    end
+
+    describe "Rack::Attack rate limiting" do
+      it "allows requests within the rate limit" do
+        10.times do
+          get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits.json"
+          expect(response.status).not_to eq(429)
+        end
+      end
+
+      it "blocks requests exceeding the rate limit of 60 per minute" do
+        # Make 61 requests to exceed the limit
+        60.times do
+          get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits.json"
+        end
+
+        # 61st request should be throttled
+        get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits.json"
+        expect(response).to have_http_status(:too_many_requests)
+        expect(response.content_type).to include("application/json")
+
+        parsed_body = JSON.parse(response.body)
+        expect(parsed_body["error"]).to match(/Rate limit exceeded/)
+        expect(parsed_body).to have_key("retry_after")
+      end
+
+      it "includes Retry-After header when rate limited" do
+        # Make 61 requests to exceed the limit
+        60.times do
+          get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits.json"
+        end
+
+        # 61st request should be throttled
+        get "/org/#{organization.permalink}/servers/#{server.permalink}/mx_rate_limits.json"
+        expect(response.headers["Retry-After"]).to be_present
+        expect(response.headers["Retry-After"].to_i).to be_between(0, 60)
+      end
+    end
   end
 end
 
