@@ -37,6 +37,26 @@ postal:
   batch_queued_messages: true
   # When de-queuing in batches, use this limit for the batch size
   batch_queued_messages_limit: 100
+  # Enable MX-based rate limiting system
+  mx_rate_limiting_enabled: true
+  # Log rate limiting decisions without actually throttling messages
+  mx_rate_limiting_shadow_mode: false
+  # Seconds to add per consecutive error (linear backoff)
+  mx_rate_limiting_delay_increment: 300
+  # Maximum delay in seconds (cap for backoff)
+  mx_rate_limiting_max_delay: 3600
+  # Number of consecutive successes needed for one recovery step
+  mx_rate_limiting_recovery_threshold: 5
+  # Seconds to reduce per recovery step
+  mx_rate_limiting_delay_decrement: 120
+  # MX DNS cache TTL in seconds
+  mx_rate_limiting_mx_cache_ttl: 3600
+  # Cleanup task interval in seconds
+  mx_rate_limiting_cleanup_interval: 3600
+  # Number of days to retain MX rate limit events
+  mx_rate_limiting_event_retention_days: 30
+  # Hours after last success before cleaning up inactive rate limits
+  mx_rate_limiting_inactive_cleanup_hours: 24
 
 web_server:
   # The default port the web server should listen on unless overriden by the PORT environment variable

@@ -9,6 +9,8 @@
 #  dkim_identifier_string :string(255)
 #  dkim_private_key       :text(65535)
 #  dkim_status            :string(255)
+#  dmarc_error            :string(255)
+#  dmarc_status           :string(255)
 #  dns_checked_at         :datetime
 #  incoming               :boolean          default(TRUE)
 #  mta_sts_enabled        :boolean          default(FALSE)

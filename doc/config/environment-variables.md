@@ -22,6 +22,16 @@ This document contains all the environment variables which are available for thi
 | `POSTAL_QUEUED_MESSAGE_LOCK_STALE_DAYS` | Integer | The number of days after which to consider a lock as stale. Messages with stale locks will be removed and not retried. | 1 |
 | `POSTAL_BATCH_QUEUED_MESSAGES` | Boolean | When enabled queued messages will be de-queued in batches based on their destination | true |
 | `POSTAL_BATCH_QUEUED_MESSAGES_LIMIT` | Integer | When de-queuing in batches, use this limit for the batch size | 100 |
+| `POSTAL_MX_RATE_LIMITING_ENABLED` | Boolean | Enable MX-based rate limiting system | true |
+| `POSTAL_MX_RATE_LIMITING_SHADOW_MODE` | Boolean | Log rate limiting decisions without actually throttling messages | false |
+| `POSTAL_MX_RATE_LIMITING_DELAY_INCREMENT` | Integer | Seconds to add per consecutive error (linear backoff) | 300 |
+| `POSTAL_MX_RATE_LIMITING_MAX_DELAY` | Integer | Maximum delay in seconds (cap for backoff) | 3600 |
+| `POSTAL_MX_RATE_LIMITING_RECOVERY_THRESHOLD` | Integer | Number of consecutive successes needed for one recovery step | 5 |
+| `POSTAL_MX_RATE_LIMITING_DELAY_DECREMENT` | Integer | Seconds to reduce per recovery step | 120 |
+| `POSTAL_MX_RATE_LIMITING_MX_CACHE_TTL` | Integer | MX DNS cache TTL in seconds | 3600 |
+| `POSTAL_MX_RATE_LIMITING_CLEANUP_INTERVAL` | Integer | Cleanup task interval in seconds | 3600 |
+| `POSTAL_MX_RATE_LIMITING_EVENT_RETENTION_DAYS` | Integer | Number of days to retain MX rate limit events | 30 |
+| `POSTAL_MX_RATE_LIMITING_INACTIVE_CLEANUP_HOURS` | Integer | Hours after last success before cleaning up inactive rate limits | 24 |
 | `WEB_SERVER_DEFAULT_PORT` | Integer | The default port the web server should listen on unless overriden by the PORT environment variable | 5000 |
 | `WEB_SERVER_DEFAULT_BIND_ADDRESS` | String | The default bind address the web server should listen on unless overriden by the BIND_ADDRESS environment variable | 127.0.0.1 |
 | `WEB_SERVER_MAX_THREADS` | Integer | The maximum number of threads which can be used by the web server | 5 |

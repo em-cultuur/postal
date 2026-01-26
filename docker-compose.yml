@@ -1,4 +1,5 @@
 services:
+
   postal:
     image: ${POSTAL_IMAGE}
     depends_on:
@@ -27,3 +28,5 @@ services:
       MARIADB_DATABASE: postal
       MARIADB_ALLOW_EMPTY_PASSWORD: 'yes'
       MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+    ports:
+      - "3306:3306"

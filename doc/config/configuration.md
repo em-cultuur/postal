@@ -58,6 +58,14 @@ For detailed MTA-STS setup instructions, see:
 - `doc/MTA-STS-KUBERNETES.md` - Kubernetes-specific configuration
 - `doc/MTA-STS-TROUBLESHOOTING-403.md` - Troubleshooting HTTP 403 errors
 
+## MX Rate Limiting Configuration
+
+Postal includes a comprehensive MX rate limiting system that automatically detects and responds to rate limiting from remote mail servers.
+
+For detailed configuration options and examples, see:
+- `doc/MX_RATE_LIMITING_CONFIGURATION.md` - Complete MX rate limiting configuration guide
+- `doc/MX_RATE_LIMITING_SPECIFICATION.md` - Technical specification and algorithm details
+
 ## Legacy configuration
 
 Legacy configuration files from Postal v1 and v2 are still supported. If you wish to use a new configuration option that is not available in the legacy format, you will need to upgrade the file to version 2.

@@ -111,6 +111,56 @@ module Postal
         description "When de-queuing in batches, use this limit for the batch size"
         default 100
       end
+
+      boolean :mx_rate_limiting_enabled do
+        description "Enable MX-based rate limiting system"
+        default true
+      end
+
+      boolean :mx_rate_limiting_shadow_mode do
+        description "Log rate limiting decisions without actually throttling messages"
+        default false
+      end
+
+      integer :mx_rate_limiting_delay_increment do
+        description "Seconds to add per consecutive error (linear backoff)"
+        default 300
+      end
+
+      integer :mx_rate_limiting_max_delay do
+        description "Maximum delay in seconds (cap for backoff)"
+        default 3600
+      end
+
+      integer :mx_rate_limiting_recovery_threshold do
+        description "Number of consecutive successes needed for one recovery step"
+        default 5
+      end
+
+      integer :mx_rate_limiting_delay_decrement do
+        description "Seconds to reduce per recovery step"
+        default 120
+      end
+
+      integer :mx_rate_limiting_mx_cache_ttl do
+        description "MX DNS cache TTL in seconds"
+        default 3600
+      end
+
+      integer :mx_rate_limiting_cleanup_interval do
+        description "Cleanup task interval in seconds"
+        default 3600
+      end
+
+      integer :mx_rate_limiting_event_retention_days do
+        description "Number of days to retain MX rate limit events"
+        default 30
+      end
+
+      integer :mx_rate_limiting_inactive_cleanup_hours do
+        description "Hours after last success before cleaning up inactive rate limits"
+        default 24
+      end
     end
 
     group :web_server do
@@ -605,7 +655,7 @@ module Postal
       string :scopes do
         description "Scopes to request from the OIDC server."
         array
-        default ["openid", "email"]
+        default %w[openid email]
       end
 
       string :uid_field do

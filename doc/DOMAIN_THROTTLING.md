@@ -341,5 +341,11 @@ Per attivare la funzionalità:
 bundle exec rails db:migrate
 ```
 
+Su Percona XtraDB Cluster, eseguire la migrazione su un singolo nodo per evitare problemi di lock.
+E' necessario lanciare temporanemente il seguente comando SQL:
+```sql
+SET GLOBAL pxc_strict_mode=PERMISSIVE;
+```
+
 La funzionalità è attiva immediatamente dopo la migrazione, senza necessità di configurazione aggiuntiva.
 

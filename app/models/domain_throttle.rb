@@ -5,16 +5,16 @@
 # Table name: domain_throttles
 #
 #  id              :integer          not null, primary key
-#  server_id       :integer          not null
 #  domain          :string(255)      not null
-#  throttled_until :datetime         not null
 #  reason          :string(255)
+#  throttled_until :datetime         not null
 #  created_at      :datetime
 #  updated_at      :datetime
+#  server_id       :integer          not null
 #
 # Indexes
 #
-#  index_domain_throttles_on_server_id_and_domain  (server_id, domain) UNIQUE
+#  index_domain_throttles_on_server_id_and_domain  (server_id,domain) UNIQUE
 #  index_domain_throttles_on_throttled_until       (throttled_until)
 #
 
