@@ -34,31 +34,16 @@ module Postal
       integer :default_maximum_delivery_attempts do
         description "The maximum number of delivery attempts"
         default 18
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "default_maximum_delivery_attempts must be a positive integer"
-          end
-        end
       end
 
       integer :default_maximum_hold_expiry_days do
         description "The number of days to hold a message before they will be expired"
         default 7
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "default_maximum_hold_expiry_days must be a positive integer"
-          end
-        end
       end
 
       integer :default_suppression_list_automatic_removal_days do
         description "The number of days an address will remain in a suppression list before being removed"
         default 30
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "default_suppression_list_automatic_removal_days must be a positive integer"
-          end
-        end
       end
 
       integer :default_spam_threshold do
@@ -140,81 +125,41 @@ module Postal
       integer :mx_rate_limiting_delay_increment do
         description "Seconds to add per consecutive error (linear backoff)"
         default 300
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_delay_increment must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_max_delay do
         description "Maximum delay in seconds (cap for backoff)"
         default 3600
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_max_delay must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_recovery_threshold do
         description "Number of consecutive successes needed for one recovery step"
         default 5
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_recovery_threshold must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_delay_decrement do
         description "Seconds to reduce per recovery step"
         default 120
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_delay_decrement must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_mx_cache_ttl do
         description "MX DNS cache TTL in seconds"
         default 3600
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_mx_cache_ttl must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_cleanup_interval do
         description "Cleanup task interval in seconds"
         default 3600
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_cleanup_interval must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_event_retention_days do
         description "Number of days to retain MX rate limit events"
         default 30
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_event_retention_days must be a positive integer"
-          end
-        end
       end
 
       integer :mx_rate_limiting_inactive_cleanup_hours do
         description "Hours after last success before cleaning up inactive rate limits"
         default 24
-        validate do |value|
-          unless value.is_a?(Integer) && value > 0
-            raise "mx_rate_limiting_inactive_cleanup_hours must be a positive integer"
-          end
-        end
       end
     end
 
