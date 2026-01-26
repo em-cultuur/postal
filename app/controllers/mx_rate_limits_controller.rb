@@ -5,7 +5,6 @@ class MXRateLimitsController < ApplicationController
   include WithinOrganization
 
   before_action { @server = organization.servers.present.find_by_permalink!(params[:server_id]) }
-  before_action :verify_server_access
 
   def index
     @rate_limits = @server.mx_rate_limits.active.includes(:events).order(current_delay: :desc)
@@ -226,24 +225,6 @@ class MXRateLimitsController < ApplicationController
   end
 
   private
-
-  # Verify that the current user can access the MX rate limits for this server
-  # The user must be an admin of the organization OR have specific server access
-  def verify_server_access
-    # User is already in the organization and can access this server
-    # due to WithinOrganization concern, but we add explicit verification
-    org_user = organization.users.joins(:organization_users).where("users.id = ?", current_user.id).first
-
-    if org_user.nil?
-      raise ActiveRecord::RecordNotFound
-    end
-
-    # Check if user can access all servers or this specific server
-    org_user_rel = current_user.organization_users.find_by(organization: organization)
-    return if org_user_rel.all_servers? || org_user_rel.servers.include?(@server)
-
-    raise ActiveRecord::RecordNotFound
-  end
 
   # Sanitize SMTP responses to prevent infrastructure disclosure
   # Extracts only the response code (e.g., "421") from the full message
