@@ -205,6 +205,65 @@ RSpec.describe "MxRateLimits API", type: :request do
       end
     end
   end
+
+  describe "Authorization - cross-organization access" do
+    let(:other_user) { create(:user) }
+    let(:other_organization) { create(:organization, owner: other_user) }
+    let(:other_server) { create(:server, organization: other_organization) }
+
+    before do
+      # Setup other organization and membership
+      OrganizationUser.create!(organization: other_organization, user: other_user, admin: true, all_servers: true)
+    end
+
+    context "when accessing another organization's rate limits" do
+      it "denies access with 404 not found" do
+        # The WithinOrganization concern will raise RecordNotFound for non-members
+        # which Rails converts to a 404 response
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+
+      it "denies access to rate limit stats for another organization" do
+        # Create a rate limit for the other organization
+        create(:mx_rate_limit, server: other_server, mx_domain: "gmail.com")
+
+        # Attempt to access it - should raise RecordNotFound
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits/gmail.com/stats.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+
+      it "denies access to summary for another organization" do
+        # Attempt to access other organization's summary
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits/summary.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+    end
+
+    context "when user is not a member of the organization" do
+      before do
+        # Make sure the current user is NOT a member of other_organization
+        OrganizationUser.where(organization: other_organization, user: user).delete_all
+      end
+
+      it "returns 404 for rate limits list" do
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+
+      it "returns 404 for rate limit stats" do
+        create(:mx_rate_limit, server: other_server, mx_domain: "gmail.com")
+
+        expect do
+          get "/org/#{other_organization.permalink}/servers/#{other_server.permalink}/mx_rate_limits/gmail.com/stats.json"
+        end.to raise_error(ActiveRecord::RecordNotFound)
+      end
+    end
+  end
 end
 
 # Tests for the format_delay_human helper method
