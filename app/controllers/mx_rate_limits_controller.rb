@@ -98,30 +98,44 @@ class MXRateLimitsController < ApplicationController
     respond_to do |wants|
       wants.json do
         render json: {
-          rate_limit: {
-            mx_domain: rate_limit.mx_domain,
-            current_delay_seconds: rate_limit.current_delay,
-            error_count: rate_limit.error_count,
-            success_count: rate_limit.success_count,
-            last_error_at: rate_limit.last_error_at,
-            last_success_at: rate_limit.last_success_at,
-            last_error_message: rate_limit.last_error_message,
-            created_at: rate_limit.created_at,
-            updated_at: rate_limit.updated_at
-          },
-          events_last_24h: recent_events.map do |event|
-            {
-              event_type: event.event_type,
-              smtp_response: event.smtp_response,
-              created_at: event.created_at
-            }
-          end
+           rate_limit: {
+             mx_domain: rate_limit.mx_domain,
+             current_delay_seconds: rate_limit.current_delay,
+             error_count: rate_limit.error_count,
+             success_count: rate_limit.success_count,
+             last_error_at: rate_limit.last_error_at,
+             last_success_at: rate_limit.last_success_at,
+             last_error_message: sanitize_smtp_response(rate_limit.last_error_message),
+             created_at: rate_limit.created_at,
+             updated_at: rate_limit.updated_at
+           },
+           events_last_24h: recent_events.map do |event|
+             {
+               event_type: event.event_type,
+               smtp_response: sanitize_smtp_response(event.smtp_response),
+               created_at: event.created_at
+             }
+           end
         }
       end
     end
   end
 
   private
+
+  # Sanitize SMTP responses to prevent infrastructure disclosure
+  # Extracts only the response code (e.g., "421") from the full message
+  # Returns nil if the response is blank or invalid
+  #
+  # @param response [String] the full SMTP response
+  # @return [String, nil] just the response code or nil
+  def sanitize_smtp_response(response)
+    return nil if response.blank?
+
+    # Extract just the response code (first 3 digits)
+    match = response.match(/\A(\d{3})/)
+    match ? match[1] : nil
+  end
 
   def prepare_events_chart_data
     events = @server.mx_rate_limit_events.where("created_at > ?", 48.hours.ago).order(created_at: :asc)
