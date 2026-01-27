@@ -189,10 +189,16 @@ module MessageDequeuer
     end
 
     def apply_domain_throttle_if_required
-      return unless Postal::Config.postal.domain_throttling_enabled?
-
       return unless @result
       return unless @result.domain_throttle_required
+
+      # Check if domain throttling is enabled
+      unless Postal::Config.postal.domain_throttling_enabled?
+        log "domain throttling is disabled, skipping throttle application",
+            domain_throttling_enabled: Postal::Config.postal.domain_throttling_enabled?,
+            domain_throttle_required: @result.domain_throttle_required
+        return
+      end
 
       domain = queued_message.message.recipient_domain
       return unless domain
