@@ -137,12 +137,15 @@ class MXRateLimit < ApplicationRecord
       increment!(:error_count)
       delay_inc = self.class.delay_increment
       max_delay_val = self.class.max_delay
+      previous_delay = current_delay
+      new_delay = [current_delay + delay_inc, max_delay_val].min
 
       update_columns(
         success_count: 0,
-        current_delay: [current_delay + delay_inc, max_delay_val].min,
+        current_delay: new_delay,
         last_error_at: Time.current,
-        last_error_message: smtp_response.to_s.truncate(MAX_ERROR_MESSAGE_LENGTH)
+        last_error_message: smtp_response.to_s.truncate(MAX_ERROR_MESSAGE_LENGTH),
+        updated_at: Time.current
       )
 
       # Log event
@@ -151,8 +154,8 @@ class MXRateLimit < ApplicationRecord
         mx_domain: mx_domain,
         recipient_domain: queued_message&.domain,
         event_type: "error",
-        delay_before: current_delay - delay_inc,
-        delay_after: current_delay,
+        delay_before: previous_delay,
+        delay_after: new_delay,
         error_count: error_count,
         success_count: success_count,
         smtp_response: smtp_response.to_s.truncate(MAX_SMTP_RESPONSE_LENGTH),
@@ -161,14 +164,14 @@ class MXRateLimit < ApplicationRecord
       )
 
       # Log delay increase
-      if current_delay_previously_was != current_delay
+      if previous_delay != new_delay
         events.create!(
           server_id: server_id,
           mx_domain: mx_domain,
           recipient_domain: queued_message&.domain,
           event_type: "delay_increased",
-          delay_before: current_delay_previously_was,
-          delay_after: current_delay,
+          delay_before: previous_delay,
+          delay_after: new_delay,
           error_count: error_count,
           success_count: success_count,
           queued_message_id: queued_message&.id
@@ -186,7 +189,8 @@ class MXRateLimit < ApplicationRecord
       increment!(:success_count)
       update_columns(
         error_count: 0,
-        last_success_at: Time.current
+        last_success_at: Time.current,
+        updated_at: Time.current
       )
 
       # Check if we should reduce delay
@@ -199,7 +203,8 @@ class MXRateLimit < ApplicationRecord
 
         update_columns(
           current_delay: new_delay,
-          success_count: 0
+          success_count: 0,
+          updated_at: Time.current
         )
 
         # Log delay decrease
