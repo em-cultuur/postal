@@ -37,6 +37,8 @@ postal:
   batch_queued_messages: true
   # When de-queuing in batches, use this limit for the batch size
   batch_queued_messages_limit: 100
+  # Enable domain-based throttling system
+  domain_throttling_enabled: false
   # Enable MX-based rate limiting system
   mx_rate_limiting_enabled: true
   # Log rate limiting decisions without actually throttling messages

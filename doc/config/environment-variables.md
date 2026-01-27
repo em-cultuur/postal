@@ -22,6 +22,7 @@ This document contains all the environment variables which are available for thi
 | `POSTAL_QUEUED_MESSAGE_LOCK_STALE_DAYS` | Integer | The number of days after which to consider a lock as stale. Messages with stale locks will be removed and not retried. | 1 |
 | `POSTAL_BATCH_QUEUED_MESSAGES` | Boolean | When enabled queued messages will be de-queued in batches based on their destination | true |
 | `POSTAL_BATCH_QUEUED_MESSAGES_LIMIT` | Integer | When de-queuing in batches, use this limit for the batch size | 100 |
+| `POSTAL_DOMAIN_THROTTLING_ENABLED` | Boolean | Enable domain-based throttling system | false |
 | `POSTAL_MX_RATE_LIMITING_ENABLED` | Boolean | Enable MX-based rate limiting system | true |
 | `POSTAL_MX_RATE_LIMITING_SHADOW_MODE` | Boolean | Log rate limiting decisions without actually throttling messages | false |
 | `POSTAL_MX_RATE_LIMITING_DELAY_INCREMENT` | Integer | Seconds to add per consecutive error (linear backoff) | 300 |

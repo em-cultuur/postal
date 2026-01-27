@@ -114,7 +114,7 @@ module Postal
 
       boolean :domain_throttling_enabled do
         description "Enable domain-based throttling system"
-        default true
+        default false
       end
 
       boolean :mx_rate_limiting_enabled do
