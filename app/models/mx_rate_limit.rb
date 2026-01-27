@@ -250,4 +250,24 @@ class MXRateLimit < ApplicationRecord
     current_delay
   end
 
+  # Mark that a probe message is being attempted
+  # Updates last_error_at to prevent multiple simultaneous probes
+  #
+  # @return [void]
+  def mark_probe_attempt
+    update_columns(last_error_at: Time.current, updated_at: Time.current)
+  end
+
+  # Check if enough time has passed to allow a probe message
+  # Probes help break deadlock by testing if remote server now accepts messages
+  #
+  # @return [Boolean] true if a probe should be allowed
+  def allow_probe?
+    return false unless last_error_at.present?
+    return false unless active?
+
+    time_since_last_attempt = Time.current - last_error_at
+    time_since_last_attempt >= current_delay
+  end
+
 end

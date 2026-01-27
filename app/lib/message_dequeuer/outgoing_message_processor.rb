@@ -303,6 +303,17 @@ module MessageDequeuer
       rate_limit = queued_message.mx_rate_limit
       return unless rate_limit&.active?
 
+      # Allow probe messages to test if the remote server now accepts messages
+      # This prevents deadlock where no messages are ever sent to record successes
+      if rate_limit.allow_probe?
+        rate_limit.mark_probe_attempt
+        log "Allowing probe message for rate-limited MX",
+            mx_domain: queued_message.mx_domain,
+            current_delay: rate_limit.current_delay,
+            time_since_last_error: (Time.current - rate_limit.last_error_at).round
+        return
+      end
+
       # Calculate retry time based on current delay
       retry_seconds = rate_limit.wait_seconds + 10
       queued_message.retry_later(retry_seconds)

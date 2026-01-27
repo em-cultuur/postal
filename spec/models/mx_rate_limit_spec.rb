@@ -300,4 +300,235 @@ RSpec.describe MXRateLimit do
       end
     end
   end
+
+  describe "#allow_probe?" do
+    let(:rate_limit) { create(:mx_rate_limit, server: server, mx_domain: "google.com") }
+
+    context "when rate limit is not active (current_delay = 0)" do
+      before do
+        rate_limit.update(current_delay: 0, last_error_at: 10.minutes.ago)
+      end
+
+      it "returns false" do
+        expect(rate_limit.allow_probe?).to be false
+      end
+    end
+
+    context "when last_error_at is nil" do
+      before do
+        rate_limit.update(current_delay: 300, last_error_at: nil)
+      end
+
+      it "returns false" do
+        expect(rate_limit.allow_probe?).to be false
+      end
+    end
+
+    context "when rate limit is active and last_error_at is present" do
+      before do
+        rate_limit.update(current_delay: 300)
+      end
+
+      context "when enough time has passed since last error" do
+        it "returns true when time since last error >= current_delay" do
+          Timecop.freeze do
+            rate_limit.update(last_error_at: 301.seconds.ago)
+            expect(rate_limit.allow_probe?).to be true
+          end
+        end
+
+        it "returns true when time since last error exactly equals current_delay" do
+          Timecop.freeze do
+            rate_limit.update(last_error_at: 300.seconds.ago)
+            expect(rate_limit.allow_probe?).to be true
+          end
+        end
+      end
+
+      context "when not enough time has passed since last error" do
+        it "returns false when time since last error < current_delay" do
+          Timecop.freeze do
+            rate_limit.update(last_error_at: 299.seconds.ago)
+            expect(rate_limit.allow_probe?).to be false
+          end
+        end
+
+        it "returns false when last error was just now" do
+          Timecop.freeze do
+            rate_limit.update(last_error_at: Time.current)
+            expect(rate_limit.allow_probe?).to be false
+          end
+        end
+      end
+    end
+
+    context "with different delay values" do
+      it "respects delay of 600 seconds" do
+        Timecop.freeze do
+          rate_limit.update(current_delay: 600, last_error_at: 599.seconds.ago)
+          expect(rate_limit.allow_probe?).to be false
+
+          rate_limit.update(last_error_at: 600.seconds.ago)
+          expect(rate_limit.allow_probe?).to be true
+        end
+      end
+
+      it "respects delay of 60 seconds" do
+        Timecop.freeze do
+          rate_limit.update(current_delay: 60, last_error_at: 59.seconds.ago)
+          expect(rate_limit.allow_probe?).to be false
+
+          rate_limit.update(last_error_at: 60.seconds.ago)
+          expect(rate_limit.allow_probe?).to be true
+        end
+      end
+    end
+  end
+
+  describe "#mark_probe_attempt" do
+    let(:rate_limit) { create(:mx_rate_limit, server: server, mx_domain: "google.com") }
+
+    it "updates last_error_at to current time" do
+      Timecop.freeze do
+        old_time = 10.minutes.ago
+        rate_limit.update(last_error_at: old_time)
+
+        rate_limit.mark_probe_attempt
+
+        expect(rate_limit.reload.last_error_at).to be_within(1.second).of(Time.current)
+        expect(rate_limit.reload.last_error_at).not_to eq(old_time)
+      end
+    end
+
+    it "updates updated_at timestamp" do
+      Timecop.freeze do
+        old_updated_at = 10.minutes.ago
+        rate_limit.update_columns(updated_at: old_updated_at)
+
+        rate_limit.mark_probe_attempt
+
+        expect(rate_limit.reload.updated_at).to be_within(1.second).of(Time.current)
+        expect(rate_limit.reload.updated_at).not_to eq(old_updated_at)
+      end
+    end
+
+    it "does not change current_delay" do
+      rate_limit.update(current_delay: 300)
+
+      expect do
+        rate_limit.mark_probe_attempt
+      end.not_to change { rate_limit.reload.current_delay }
+    end
+
+    it "does not change error_count" do
+      rate_limit.update(error_count: 5)
+
+      expect do
+        rate_limit.mark_probe_attempt
+      end.not_to change { rate_limit.reload.error_count }
+    end
+
+    it "does not change success_count" do
+      rate_limit.update(success_count: 3)
+
+      expect do
+        rate_limit.mark_probe_attempt
+      end.not_to change { rate_limit.reload.success_count }
+    end
+  end
+
+  describe "probe message flow" do
+    let(:rate_limit) { create(:mx_rate_limit, server: server, mx_domain: "google.com") }
+
+    context "preventing multiple simultaneous probes" do
+      it "allows only one probe per delay period" do
+        Timecop.freeze do
+          # Initial error creates 300s delay
+          rate_limit.record_error(smtp_response: "421 Rate limited")
+          expect(rate_limit.reload.current_delay).to eq(300)
+
+          # Not enough time passed - no probe
+          Timecop.travel(299.seconds.from_now) do
+            expect(rate_limit.allow_probe?).to be false
+          end
+
+          # Exactly 300 seconds - probe allowed
+          Timecop.travel(300.seconds.from_now) do
+            expect(rate_limit.allow_probe?).to be true
+
+            # Mark probe attempt
+            rate_limit.mark_probe_attempt
+
+            # Immediately after marking, no new probe should be allowed
+            expect(rate_limit.reload.allow_probe?).to be false
+          end
+
+          # After another delay period, next probe is allowed
+          Timecop.travel(600.seconds.from_now) do
+            expect(rate_limit.reload.allow_probe?).to be true
+          end
+        end
+      end
+    end
+
+    context "recovery scenario" do
+      it "allows gradual recovery through successful probes" do
+        base_time = Time.current
+        Timecop.freeze(base_time) do
+          # Start with active rate limit
+          rate_limit.update(
+            current_delay: 600,
+            error_count: 10,
+            success_count: 0,
+            last_error_at: base_time - 601.seconds
+          )
+
+          # First probe - is allowed
+          expect(rate_limit.allow_probe?).to be true
+          rate_limit.mark_probe_attempt
+
+          # Simulate successful probe delivery
+          rate_limit.record_success
+          expect(rate_limit.reload.success_count).to eq(1)
+
+          # Not enough successes yet - delay unchanged
+          expect(rate_limit.current_delay).to eq(600)
+        end
+
+        # Simulate 4 more successful probes at 600 second intervals
+        (1..4).each do |i|
+          Timecop.freeze(base_time + (i * 600).seconds) do
+            expect(rate_limit.reload.allow_probe?).to be true
+            rate_limit.mark_probe_attempt
+            rate_limit.record_success
+          end
+        end
+
+        # After 5th success, delay should decrease
+        expect(rate_limit.reload.current_delay).to eq(600 - MXRateLimit.delay_decrement)
+        expect(rate_limit.success_count).to eq(0) # Reset after decrease
+      end
+    end
+
+    context "failed probe scenario" do
+      it "increases delay if probe fails" do
+        Timecop.freeze do
+          rate_limit.update(current_delay: 300, last_error_at: 301.seconds.ago)
+
+          # Probe is allowed
+          expect(rate_limit.allow_probe?).to be true
+          rate_limit.mark_probe_attempt
+
+          # Probe fails - record another error
+          rate_limit.record_error(smtp_response: "421 Still rate limited")
+
+          # Delay should increase
+          expect(rate_limit.reload.current_delay).to eq(600)
+
+          # Success count reset
+          expect(rate_limit.success_count).to eq(0)
+        end
+      end
+    end
+  end
 end
