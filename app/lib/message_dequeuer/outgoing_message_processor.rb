@@ -82,6 +82,8 @@ module MessageDequeuer
     end
 
     def skip_if_domain_throttled
+      return unless Postal::Config.postal.domain_throttling_enabled?
+
       return if queued_message.manual?
 
       domain = queued_message.message.recipient_domain
@@ -187,6 +189,8 @@ module MessageDequeuer
     end
 
     def apply_domain_throttle_if_required
+      return unless Postal::Config.postal.domain_throttling_enabled?
+
       return unless @result
       return unless @result.domain_throttle_required
 
