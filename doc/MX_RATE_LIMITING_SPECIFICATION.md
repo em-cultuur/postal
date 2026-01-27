@@ -354,6 +354,17 @@ DELAY_DECREMENT = 120              # -2 minutes per recovery step
 
 #active?                           # current_delay > 0
 #wait_seconds                      # Returns current_delay
+
+#allow_probe?                      # Check if probe message should be allowed
+  # - Returns false if current_delay = 0 (not rate limited)
+  # - Returns false if last_error_at is nil (new rate limit)
+  # - Returns true if (Time.current - last_error_at) >= current_delay
+  # - Prevents deadlock by allowing periodic test messages
+  
+#mark_probe_attempt                # Mark that a probe is being sent
+  # - Updates last_error_at to Time.current
+  # - Prevents multiple simultaneous probes
+  # - Updates updated_at timestamp
 ```
 
 **Associations:**
@@ -552,6 +563,19 @@ def skip_if_mx_rate_limited
   rate_limit = queued_message.mx_rate_limit
   return unless rate_limit&.active?
 
+  # PROBE MESSAGE MECHANISM: Prevent deadlock by allowing periodic test messages
+  # When rate limited (current_delay > 0), no messages would normally be sent
+  # This creates a deadlock: no sends → no successes → delay never decreases
+  # Solution: Allow ONE message through every current_delay seconds to test recovery
+  if rate_limit.allow_probe?
+    rate_limit.mark_probe_attempt
+    log "Allowing probe message for rate-limited MX",
+        mx_domain: queued_message.mx_domain,
+        current_delay: rate_limit.current_delay,
+        time_since_last_error: (Time.current - rate_limit.last_error_at).round
+    return  # Let message through as a probe
+  end
+
   # Calculate retry time based on current delay
   retry_seconds = rate_limit.wait_seconds + 10
   queued_message.retry_later(retry_seconds)
@@ -562,20 +586,49 @@ def skip_if_mx_rate_limited
       error_count: rate_limit.error_count,
       retry_after: queued_message.retry_after
   
-  # Log throttled event
-  rate_limit.events.create!(
-    server_id: queued_message.server_id,
-    recipient_domain: queued_message.domain,
-    event_type: "throttled",
-    delay_before: rate_limit.current_delay,
-    delay_after: rate_limit.current_delay,
-    error_count: rate_limit.error_count,
-    success_count: rate_limit.success_count,
-    queued_message_id: queued_message.id
+  # Log throttled event (with deduplication - only if no recent throttled event exists)
+  unless MXRateLimitEvent.recent_throttled_event_exists?(
+    queued_message.server_id,
+    queued_message.mx_domain
   )
+    rate_limit.events.create!(
+      server_id: queued_message.server_id,
+      recipient_domain: queued_message.domain,
+      event_type: "throttled",
+      delay_before: rate_limit.current_delay,
+      delay_after: rate_limit.current_delay,
+      error_count: rate_limit.error_count,
+      success_count: rate_limit.success_count,
+      queued_message_id: queued_message.id
+    )
+  end
   
   stop_processing
 end
+```
+
+**Probe Message Flow:**
+
+The probe message mechanism prevents deadlock in rate-limited scenarios:
+
+1. **Normal Rate Limiting**: When `current_delay > 0`, all messages are blocked
+2. **Deadlock Problem**: If all messages blocked → no successes can be recorded → delay never decreases
+3. **Probe Solution**: After `current_delay` seconds, allow ONE message through to test if remote server accepts it
+4. **Probe Success**: If probe succeeds → `success_count` increments → after threshold, delay decreases
+5. **Probe Failure**: If probe fails → `error_count` increments → delay increases further
+6. **Race Prevention**: `mark_probe_attempt` updates `last_error_at` → prevents multiple simultaneous probes
+
+**Example Scenario:**
+
+```
+T=0s:   Error received, current_delay set to 300s
+T=1s:   All messages blocked (wait 300s)
+T=150s: All messages still blocked (wait 150s more)
+T=300s: allow_probe? returns true → ONE message allowed through
+        mark_probe_attempt updates last_error_at to T=300s
+T=301s: allow_probe? returns false (only 1s since last attempt)
+T=600s: If first probe succeeded and 4 more succeeded: delay decreases to 180s
+        If first probe failed: delay increased to 600s, next probe at T=900s
 ```
 
 #### Step: `handle_mx_rate_limit_response`
