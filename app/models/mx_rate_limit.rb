@@ -40,11 +40,9 @@ class MXRateLimit < ApplicationRecord
 
   belongs_to :server
 
-  has_many :events,
-           class_name: "MXRateLimitEvent",
-           foreign_key: :server_id,
-           primary_key: :server_id,
-           dependent: :delete_all
+  # Events are associated by server_id and mx_domain (no direct foreign key)
+  # Use MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain)
+  # to query events for this rate limit
 
   # NOTE: whitelist is managed separately in MXRateLimitWhitelist table
   # Use MXRateLimitWhitelist.whitelisted?(server, mx_domain) to check
@@ -55,6 +53,13 @@ class MXRateLimit < ApplicationRecord
 
   scope :active, -> { where("current_delay > ?", 0) }
   scope :inactive, -> { where(current_delay: 0) }
+
+  # Get events for this rate limit
+  #
+  # @return [ActiveRecord::Relation<MXRateLimitEvent>]
+  def events
+    MXRateLimitEvent.where(server_id: server_id, mx_domain: mx_domain)
+  end
 
   # Configuration accessors
   #

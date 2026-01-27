@@ -7,7 +7,7 @@ class MXRateLimitsController < ApplicationController
   before_action { @server = organization.servers.present.find_by_permalink!(params[:server_id]) }
 
   def index
-    @rate_limits = @server.mx_rate_limits.active.includes(:events).order(current_delay: :desc)
+    @rate_limits = @server.mx_rate_limits.active.order(current_delay: :desc)
 
     respond_to do |wants|
       wants.html do
