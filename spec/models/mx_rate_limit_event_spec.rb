@@ -119,12 +119,51 @@ RSpec.describe MXRateLimitEvent do
     end
   end
 
+  describe ".recent_throttled_event_exists?" do
+    it "returns true when a recent throttled event exists" do
+      create(:mx_rate_limit_event, server: server, mx_domain: "google.com", event_type: "throttled", created_at: 2.minutes.ago)
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com")).to be true
+    end
+
+    it "returns false when no throttled event exists" do
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com")).to be false
+    end
+
+    it "returns false when only old throttled events exist" do
+      create(:mx_rate_limit_event, server: server, mx_domain: "google.com", event_type: "throttled", created_at: 10.minutes.ago)
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com", within: 5.minutes)).to be false
+    end
+
+    it "returns false when only non-throttled events exist" do
+      create(:mx_rate_limit_event, server: server, mx_domain: "google.com", event_type: "error", created_at: 1.minute.ago)
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com")).to be false
+    end
+
+    it "returns false for different mx_domain" do
+      create(:mx_rate_limit_event, server: server, mx_domain: "yahoo.com", event_type: "throttled", created_at: 1.minute.ago)
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com")).to be false
+    end
+
+    it "returns false for different server" do
+      other_server = create(:server, organization: organization, name: "Other Server")
+      create(:mx_rate_limit_event, server: other_server, mx_domain: "google.com", event_type: "throttled", created_at: 1.minute.ago)
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com")).to be false
+    end
+
+    it "uses custom time window when provided" do
+      create(:mx_rate_limit_event, server: server, mx_domain: "google.com", event_type: "throttled", created_at: 8.minutes.ago)
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com", within: 10.minutes)).to be true
+      expect(MXRateLimitEvent.recent_throttled_event_exists?(server, "google.com", within: 5.minutes)).to be false
+    end
+  end
+
   describe "scopes" do
     before do
       @error1 = create(:mx_rate_limit_event, server: server, event_type: "error", created_at: 1.hour.ago)
       @error2 = create(:mx_rate_limit_event, server: server, event_type: "error", created_at: 2.hours.ago)
       @success1 = create(:mx_rate_limit_event, :success, server: server, created_at: 30.minutes.ago)
       @success2 = create(:mx_rate_limit_event, :success, server: server, created_at: 3.hours.ago)
+      @throttled1 = create(:mx_rate_limit_event, :throttled, server: server, created_at: 1.hour.ago)
       @old_error = create(:mx_rate_limit_event, server: server, event_type: "error", created_at: 25.hours.ago)
     end
 
@@ -140,9 +179,15 @@ RSpec.describe MXRateLimitEvent do
       end
     end
 
+    describe ".throttled" do
+      it "returns only throttled events" do
+        expect(MXRateLimitEvent.throttled).to contain_exactly(@throttled1)
+      end
+    end
+
     describe ".recent" do
       it "returns events from last 24 hours" do
-        expect(MXRateLimitEvent.recent).to contain_exactly(@error1, @error2, @success1, @success2)
+        expect(MXRateLimitEvent.recent).to contain_exactly(@error1, @error2, @success1, @success2, @throttled1)
       end
     end
   end

@@ -43,6 +43,7 @@ class MXRateLimitEvent < ApplicationRecord
 
   scope :errors, -> { where(event_type: "error") }
   scope :successes, -> { where(event_type: "success") }
+  scope :throttled, -> { where(event_type: "throttled") }
   scope :recent, -> { where("created_at > ?", 24.hours.ago) }
 
   # Get statistics for an MX domain
@@ -64,6 +65,20 @@ class MXRateLimitEvent < ApplicationRecord
   def self.cleanup_old
     retention_days = Postal::Config.postal.mx_rate_limiting_event_retention_days
     where("created_at < ?", retention_days.days.ago).delete_all
+  end
+
+  # Check if a throttled event was recently logged for an MX domain
+  #
+  # @param server [Server] the server to check
+  # @param mx_domain [String] the MX domain to check
+  # @param within [ActiveSupport::Duration] the time window to check (default: from config)
+  # @return [Boolean] true if a throttled event exists within the time window
+  def self.recent_throttled_event_exists?(server, mx_domain, within: nil)
+    window = within || Postal::Config.postal.mx_rate_limiting_throttled_event_window.seconds
+    throttled
+      .where(server: server, mx_domain: mx_domain)
+      .where("created_at > ?", window.ago)
+      .exists?
   end
 
 end

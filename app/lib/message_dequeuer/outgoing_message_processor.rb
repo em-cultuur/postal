@@ -313,18 +313,20 @@ module MessageDequeuer
           error_count: rate_limit.error_count,
           retry_after: queued_message.retry_after
 
-      # Log throttled event
-      rate_limit.events.create!(
-        server_id: queued_message.server_id,
-        mx_domain: rate_limit.mx_domain,
-        recipient_domain: queued_message.domain,
-        event_type: "throttled",
-        delay_before: rate_limit.current_delay,
-        delay_after: rate_limit.current_delay,
-        error_count: rate_limit.error_count,
-        success_count: rate_limit.success_count,
-        queued_message_id: queued_message.id
-      )
+      # Log throttled event only if no recent event exists (prevents flood of duplicate events)
+      unless MXRateLimitEvent.recent_throttled_event_exists?(queued_message.server, rate_limit.mx_domain)
+        rate_limit.events.create!(
+          server_id: queued_message.server_id,
+          mx_domain: rate_limit.mx_domain,
+          recipient_domain: queued_message.domain,
+          event_type: "throttled",
+          delay_before: rate_limit.current_delay,
+          delay_after: rate_limit.current_delay,
+          error_count: rate_limit.error_count,
+          success_count: rate_limit.success_count,
+          queued_message_id: queued_message.id
+        )
+      end
 
       stop_processing
     end

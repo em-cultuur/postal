@@ -166,6 +166,11 @@ module Postal
         description "Hours after last success before cleaning up inactive rate limits"
         default 24
       end
+
+      integer :mx_rate_limiting_throttled_event_window do
+        description "Seconds to wait before logging another throttled event for the same MX domain (prevents flood of duplicate events)"
+        default 300
+      end
     end
 
     group :web_server do
