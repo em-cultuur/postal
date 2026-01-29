@@ -3,9 +3,9 @@
 class IPAddressesController < ApplicationController
 
   before_action :admin_required
-  before_action :load_ip_pool, except: [:reputation, :pause, :unpause, :advance_warmup, :reset_warmup]
+  before_action :load_ip_pool, except: [:reputation, :pause, :unpause, :advance_warmup, :reset_warmup, :move]
   before_action :load_ip_address_from_pool, only: [:new, :create, :update, :destroy, :edit]
-  before_action :load_ip_address_direct, only: [:reputation, :pause, :unpause, :advance_warmup, :reset_warmup]
+  before_action :load_ip_address_direct, only: [:reputation, :pause, :unpause, :advance_warmup, :reset_warmup, :move]
 
   def new
     @ip_address = @ip_pool.ip_addresses.build
@@ -210,6 +210,39 @@ class IPAddressesController < ApplicationController
     respond_to do |format|
       format.html { redirect_back fallback_location: [:edit, @ip_pool], notice: message }
       format.json { render json: { success: true, message: message } }
+    end
+  end
+
+  # GET /ip_addresses/:id/move
+  # POST /ip_addresses/:id/move
+  # Move IP address to a different pool
+  def move
+    @available_pools = IPPool.where.not(id: @ip_address.ip_pool_id).order(:name)
+
+    return unless request.post?
+
+    new_pool_id = params[:new_pool_id]
+
+    if new_pool_id.blank?
+      @error = "Please select a destination pool"
+      return render :move
+    end
+
+    new_pool = IPPool.find_by(id: new_pool_id)
+
+    if new_pool.nil?
+      @error = "Invalid pool selected"
+      return render :move
+    end
+
+    old_pool = @ip_address.ip_pool
+
+    if @ip_address.update(ip_pool_id: new_pool.id)
+      message = "IP address #{@ip_address.ipv4} moved from #{old_pool.name} to #{new_pool.name}"
+      redirect_to [:edit, new_pool], notice: message
+    else
+      @error = "Failed to move IP address"
+      render :move
     end
   end
 

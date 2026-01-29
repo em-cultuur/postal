@@ -1,0 +1,35 @@
+- page_title << "IP Pools"
+- page_title << @ip_address.ip_pool.name
+- page_title << "Move IP address"
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "IP Pools", :ip_pools
+      &rarr;
+      = @ip_address.ip_pool.name
+      &rarr;
+    Move IP address
+
+.pageContent.pageContent--compact
+  %p.pageContent__intro
+    Move
+    %strong= @ip_address.ipv4
+    from
+    %strong= @ip_address.ip_pool.name
+    to another IP pool.
+
+  - if @error
+    .alert.alert--error= @error
+
+  = form_tag [:move, @ip_address], :method => :post do
+    %fieldset.fieldSet.u-margin
+      .fieldSet__field
+        = label_tag :new_pool_id, "Destination IP Pool", :class => 'fieldSet__label'
+        .fieldSet__input
+          = select_tag :new_pool_id, options_from_collection_for_select(@available_pools, :id, :name), :class => 'input input--select', :prompt => "Select a pool"
+          %p.fieldSet__text
+            Select the IP pool where you want to move this IP address.
+
+    .fieldSetSubmit.buttonSet
+      = submit_tag "Move IP address", :class => 'button button--positive'
+      = link_to "Cancel", [:edit, @ip_address.ip_pool], :class => 'button'

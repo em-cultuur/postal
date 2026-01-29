@@ -109,6 +109,7 @@ Rails.application.routes.draw do
       post :unpause
       post :advance_warmup
       post :reset_warmup
+      match :move, via: [:get, :post]
     end
   end
 
