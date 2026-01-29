@@ -89,6 +89,35 @@
   padding: 20px 0 !important;
 }
 
+// Override Chartist default colors to match legend
+#mxRateLimitingChart {
+
+  .ct-series-a .ct-point,
+  .ct-series-a .ct-line,
+  .ct-series-a .ct-bar,
+  .ct-series-a .ct-slice-donut {
+    stroke: #d52b1e; // Errors - red
+  }
+
+  .ct-series-a .ct-slice-pie,
+  .ct-series-a .ct-area {
+    fill: #d52b1e;
+  }
+
+  .ct-series-b .ct-point,
+  .ct-series-b .ct-line,
+  .ct-series-b .ct-bar,
+  .ct-series-b .ct-slice-donut {
+    stroke: #68a357; // Successes - green
+  }
+
+  .ct-series-b .ct-slice-pie,
+  .ct-series-b .ct-area {
+    fill: #68a357;
+  }
+
+}
+
 .mxRateLimitingDashboard__chartLegend {
   padding: 0 20px 10px 20px;
   display: flex;
