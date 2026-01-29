@@ -117,13 +117,59 @@ class MXRateLimit < ApplicationRecord
   end
 
   # Remove inactive rate limits (delay=0, last_success > cleanup threshold)
+  # Also removes abandoned active rate limits (delay>0 but no activity for delay * multiplier)
   #
   # @return [Integer] the number of records deleted
   def self.cleanup_inactive
+    deleted_count = 0
+
+    # Cleanup inactive rate limits (delay=0)
     cleanup_hours = Postal::Config.postal.mx_rate_limiting_inactive_cleanup_hours
-    inactive
-      .where("last_success_at < ?", cleanup_hours.hours.ago)
-      .delete_all
+    deleted_count += inactive
+                     .where("last_success_at < ?", cleanup_hours.hours.ago)
+                     .delete_all
+
+    # Cleanup abandoned active rate limits (delay>0 but no recent activity)
+    deleted_count += cleanup_abandoned
+
+    deleted_count
+  end
+
+  # Remove abandoned active rate limits that have had no activity for a long time
+  # Criteria: current_delay > 0 AND last_activity_at < (current_delay * multiplier) ago
+  # Also applies a minimum threshold to prevent premature cleanup of short delays
+  #
+  # @return [Integer] the number of records deleted
+  def self.cleanup_abandoned
+    multiplier = Postal::Config.postal.mx_rate_limiting_abandoned_multiplier
+    min_hours = Postal::Config.postal.mx_rate_limiting_abandoned_min_hours
+    min_threshold_seconds = min_hours.hours.to_i
+
+    deleted_count = 0
+
+    # Process in batches to avoid loading all records at once
+    active.find_each do |rate_limit|
+      # Calculate the most recent activity timestamp
+      last_activity = [rate_limit.last_success_at, rate_limit.last_error_at].compact.max
+
+      # Skip if no activity recorded (shouldn't happen, but be safe)
+      next unless last_activity
+
+      # Calculate time since last activity in seconds
+      time_since_activity = (Time.current - last_activity).to_i
+
+      # Calculate the abandonment threshold (max of delay-based and minimum absolute)
+      delay_based_threshold = rate_limit.current_delay * multiplier
+      abandonment_threshold = [delay_based_threshold, min_threshold_seconds].max
+
+      # Delete if abandoned
+      if time_since_activity >= abandonment_threshold
+        rate_limit.destroy
+        deleted_count += 1
+      end
+    end
+
+    deleted_count
   end
 
   # Record an error and apply rate limiting

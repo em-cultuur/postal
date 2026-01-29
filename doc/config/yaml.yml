@@ -59,6 +59,10 @@ postal:
   mx_rate_limiting_event_retention_days: 30
   # Hours after last success before cleaning up inactive rate limits
   mx_rate_limiting_inactive_cleanup_hours: 24
+  # Multiplier for current_delay to determine abandoned rate limit cleanup threshold (if no activity for delay * multiplier, delete the record even if active)
+  mx_rate_limiting_abandoned_multiplier: 3
+  # Minimum hours before an active rate limit can be considered abandoned (prevents premature cleanup of short delays)
+  mx_rate_limiting_abandoned_min_hours: 48
   # Seconds to wait before logging another throttled event for the same MX domain (prevents flood of duplicate events)
   mx_rate_limiting_throttled_event_window: 300
 
