@@ -93,6 +93,9 @@ Rails.application.routes.draw do
     resources :ip_addresses
   end
 
+  # Admin Dashboard
+  get "admin/dashboard" => "admin_dashboard#index", as: "admin_dashboard"
+
   # IP Reputation Management (Phase 8)
   resources :ip_reputation, only: [:index] do
     collection do

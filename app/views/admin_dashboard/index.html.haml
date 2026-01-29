@@ -1,0 +1,97 @@
+- page_title << "Admin Dashboard"
+
+.pageHeader
+  %h1.pageHeader__title System Dashboard
+  %p.pageHeader__intro Overview of all organizations and mail servers
+
+.pageContent
+
+  .adminDashboard__totals
+    %h2.adminDashboard__totalsTitle System-Wide Statistics
+
+    .adminDashboard__totalsBoxes
+      .adminDashboard__statsCard.adminDashboard__statsCard--held
+        .adminDashboard__statsValue= number_with_delimiter @total_held_messages
+        .adminDashboard__statsLabel Messages Held
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--queue
+        .adminDashboard__statsValue= number_with_delimiter @total_queued_messages
+        .adminDashboard__statsLabel Queued Messages
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--bounces
+        .adminDashboard__statsValue= number_to_percentage @total_bounce_rate, precision: 1
+        .adminDashboard__statsLabel Bounce Rate
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--size
+        .adminDashboard__statsValue= number_to_human_size @total_bytes_used
+        .adminDashboard__statsLabel Disk Used
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--incoming
+        .adminDashboard__statsValue= number_with_delimiter @total_incoming_60min
+        .adminDashboard__statsLabel Incoming (60m)
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--outgoing
+        .adminDashboard__statsValue= number_with_delimiter @total_outgoing_60min
+        .adminDashboard__statsLabel Outgoing (60m)
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--rate
+        .adminDashboard__statsValue= number_with_precision @total_messages_per_minute, precision: 2
+        .adminDashboard__statsLabel Messages/Minute
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--servers
+        .adminDashboard__statsValue= number_with_delimiter @server_count
+        .adminDashboard__statsLabel Active Servers
+
+  %h2.adminDashboard__serversTitle All Servers by Organization
+
+  - if @organizations.empty?
+    .noData
+      %p.noData__title No organizations found
+      %p.noData__text There are currently no organizations in the system.
+
+  - else
+    .adminDashboard__serversList
+      - @organizations.each do |organization|
+        - servers = organization.servers.present.order(:name).to_a
+        - next if servers.empty?
+
+        .adminDashboard__organization
+          %h3.adminDashboard__organizationName
+            = link_to organization.name, organization_root_path(organization)
+            %span.adminDashboard__organizationServerCount
+              = pluralize servers.size, "server"
+
+          %table.adminDashboard__table
+            %thead
+              %tr
+                %th.adminDashboard__tableHeader Server Name
+                %th.adminDashboard__tableHeader.u-center Status
+                %th.adminDashboard__tableHeader.u-center Held
+                %th.adminDashboard__tableHeader.u-center Queued
+                %th.adminDashboard__tableHeader.u-center Bounce Rate
+                %th.adminDashboard__tableHeader.u-center Disk Used
+                %th.adminDashboard__tableHeader.u-center In (60m)
+                %th.adminDashboard__tableHeader.u-center Out (60m)
+                %th.adminDashboard__tableHeader.u-center Msg/Min
+            %tbody
+              - servers.each do |server|
+                %tr.adminDashboard__tableRow
+                  %td.adminDashboard__tableCell
+                    = link_to server.name, organization_server_path(organization, server)
+                  %td.adminDashboard__tableCell.u-center
+                    %span.adminDashboard__status{class: "adminDashboard__status--#{server.status.underscore}"}
+                      = server.status
+                  %td.adminDashboard__tableCell.u-center
+                    = number_with_delimiter server.held_messages
+                  %td.adminDashboard__tableCell.u-center
+                    = number_with_delimiter server.queue_size
+                  %td.adminDashboard__tableCell.u-center
+                    = number_to_percentage server.bounce_rate, precision: 1
+                  %td.adminDashboard__tableCell.u-center
+                    = number_to_human_size server.message_db.total_size
+                  %td.adminDashboard__tableCell.u-center
+                    = number_with_delimiter server.throughput_stats[:incoming]
+                  %td.adminDashboard__tableCell.u-center
+                    = number_with_delimiter server.throughput_stats[:outgoing]
+                  %td.adminDashboard__tableCell.u-center
+                    = number_with_precision server.message_rate, precision: 2
