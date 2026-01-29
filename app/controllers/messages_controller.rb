@@ -6,6 +6,7 @@ class MessagesController < ApplicationController
 
   before_action { @server = organization.servers.present.find_by_permalink!(params[:server_id]) }
   before_action { params[:id] && @message = @server.message_db.message(params[:id].to_i) }
+  before_action :check_domain_throttling_enabled, only: [:throttled_domains, :remove_throttled_domain]
 
   def new
     if params[:direction] == "incoming"
@@ -169,6 +170,20 @@ class MessagesController < ApplicationController
   end
 
   private
+
+  def check_domain_throttling_enabled
+    return if Postal::Config.postal.domain_throttling_enabled?
+
+    respond_to do |format|
+      format.html do
+        redirect_to organization_server_path(organization, @server),
+                    alert: "Domain throttling is not enabled on this installation."
+      end
+      format.json do
+        render json: { error: "Domain throttling is not enabled" }, status: :not_found
+      end
+    end
+  end
 
   def get_messages(scope)
     if scope == "held"
