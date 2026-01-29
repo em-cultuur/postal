@@ -26,7 +26,7 @@ RSpec.describe "SMTP Rejection Integration", type: :integration do
       destination_domain = "gmail.com"
 
       # Parse the response
-      parsed = IPBlacklist::SmtpResponseParser.parse(smtp_message, smtp_code)
+      parsed = IPBlacklist::SMTPResponseParser.parse(smtp_message, smtp_code)
 
       expect(parsed[:blacklist_detected]).to be true
       expect(parsed[:severity]).to eq("high")
@@ -130,7 +130,7 @@ RSpec.describe "SMTP Rejection Integration", type: :integration do
     context "Gmail patterns" do
       it "detects Gmail rate limiting" do
         message = "421-4.7.0 [192.0.2.1] Our system has detected that this message is suspicious due to rate limit exceeded."
-        result = IPBlacklist::SmtpResponseParser.parse(message, "421")
+        result = IPBlacklist::SMTPResponseParser.parse(message, "421")
 
         expect(result[:blacklist_detected]).to be true
         expect(result[:blacklist_source]).to eq("gmail_rate_limit")
@@ -139,7 +139,7 @@ RSpec.describe "SMTP Rejection Integration", type: :integration do
 
       it "detects Gmail temporary block" do
         message = "421-4.7.0 Try again later, closing connection."
-        result = IPBlacklist::SmtpResponseParser.parse(message, "421")
+        result = IPBlacklist::SMTPResponseParser.parse(message, "421")
 
         expect(result[:blacklist_detected]).to be true
         expect(result[:blacklist_source]).to eq("gmail_temporary_block")
@@ -150,7 +150,7 @@ RSpec.describe "SMTP Rejection Integration", type: :integration do
     context "Generic DNSBL patterns" do
       it "detects Spamhaus listing" do
         message = "554 Service unavailable; Client host [192.0.2.1] blocked using zen.spamhaus.org"
-        result = IPBlacklist::SmtpResponseParser.parse(message, "554")
+        result = IPBlacklist::SMTPResponseParser.parse(message, "554")
 
         expect(result[:blacklist_detected]).to be true
         expect(result[:blacklist_source]).to eq("spamhaus_zen")

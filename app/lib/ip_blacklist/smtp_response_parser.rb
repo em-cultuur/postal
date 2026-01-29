@@ -9,7 +9,7 @@ module IPBlacklist
   # - Generic DNSBL patterns: Spamhaus, Barracuda, SORBS, SpamCop, etc.
   #
   # @example Parse an SMTP error message
-  #   result = IPBlacklist::SmtpResponseParser.parse(
+  #   result = IPBlacklist::SMTPResponseParser.parse(
   #     "554 Service unavailable; Client host [192.0.2.1] blocked using zen.spamhaus.org",
   #     "554"
   #   )
@@ -17,7 +17,7 @@ module IPBlacklist
   #   result[:blacklist_source] # => "spamhaus_zen"
   #   result[:severity] # => "high"
   #
-  class SmtpResponseParser
+  class SMTPResponseParser
 
     # Security: Protect against ReDoS attacks
     MESSAGE_MAX_LENGTH = 5000
@@ -171,7 +171,7 @@ module IPBlacklist
             check_generic_dnsbl_patterns(safe_message, result)
         end
       rescue Timeout::Error
-        Rails.logger.warn("[IPBlacklist::SmtpResponseParser] Pattern matching timeout - possible ReDoS attempt. Message length: #{message.length}")
+        Rails.logger.warn("[IPBlacklist::SMTPResponseParser] Pattern matching timeout - possible ReDoS attempt. Message length: #{message.length}")
         # Return safe default result on timeout
         result[:description] = "Pattern matching timeout - message too complex"
       end

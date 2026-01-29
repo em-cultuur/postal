@@ -3,7 +3,7 @@
 require "rails_helper"
 require_relative "../../../app/lib/ip_blacklist/smtp_response_parser"
 
-RSpec.describe IPBlacklist::SmtpResponseParser do
+RSpec.describe IPBlacklist::SMTPResponseParser do
   describe ".parse" do
     context "with empty or nil message" do
       it "returns default result for nil message" do

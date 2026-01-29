@@ -159,7 +159,7 @@ module IPBlacklist
       #
       # @param ip_address [IPAddress] The IP address
       # @param destination_domain [String] The destination domain
-      # @param parsed_response [Hash] Parsed SMTP response from SmtpResponseParser
+      # @param parsed_response [Hash] Parsed SMTP response from SMTPResponseParser
       # @param smtp_code [String] The SMTP response code
       # @param smtp_message [String] The full SMTP error message
       #

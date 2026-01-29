@@ -263,7 +263,7 @@ class SMTPSender < BaseSender
     return unless smtp_code
 
     # Parse the SMTP response
-    parsed = IPBlacklist::SmtpResponseParser.parse(exception.message, smtp_code)
+    parsed = IPBlacklist::SMTPResponseParser.parse(exception.message, smtp_code)
 
     # Handle based on blacklist detection and bounce type
     if parsed[:blacklist_detected]
