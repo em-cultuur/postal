@@ -83,6 +83,12 @@ module IPBlacklist
     # Outlook/Hotmail-specific patterns (optimized for ReDoS protection)
     OUTLOOK_PATTERNS = [
       {
+        regex: /\A.{0,200}550[- ]5\.7\.1.{0,100}messages from.{0,50}weren't sent.{0,100}on our block list/i,
+        source: "outlook_block_list",
+        severity: "high",
+        description: "Outlook/Hotmail network block list (S3150 or similar)"
+      },
+      {
         regex: /\A.{0,200}550[- ]5\.7\.1.{0,50}Service unavailable.{0,50}Client host.{0,50}rejected/i,
         source: "outlook_ip_blocked",
         severity: "high",
