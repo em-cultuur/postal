@@ -255,8 +255,27 @@ class SMTPSender < BaseSender
   # @param soft_bounce [Boolean] Whether this is a soft bounce
   #
   def handle_smtp_error_response(exception, soft_bounce:)
-    return unless @source_ip_address # Only process if we have an IP address
     return unless smtp_response_analysis_enabled? # Check if feature is enabled
+
+    # Try to get source IP address
+    source_ip = @source_ip_address
+
+    # If no IP address is set, try to extract it from the SMTP error message
+    if source_ip.nil?
+      extracted_ip = extract_ip_from_smtp_message(exception.message)
+      if extracted_ip
+        source_ip = find_ip_address_by_ip(extracted_ip)
+        if source_ip
+          logger.info "[SMTP BLACKLIST] Extracted IP #{extracted_ip} from SMTP error message"
+        else
+          logger.warn "[SMTP BLACKLIST] Extracted IP #{extracted_ip} from SMTP error but not found in database"
+          return
+        end
+      else
+        logger.debug "[SMTP BLACKLIST] No source IP address available and unable to extract from SMTP message"
+        return
+      end
+    end
 
     # Extract SMTP code from exception message
     smtp_code = extract_smtp_code(exception.message)
@@ -267,7 +286,7 @@ class SMTPSender < BaseSender
 
     # Handle based on blacklist detection and bounce type
     if parsed[:blacklist_detected]
-      handle_blacklist_detected_in_smtp(parsed, smtp_code, exception.message, soft_bounce)
+      handle_blacklist_detected_in_smtp(parsed, smtp_code, exception.message, soft_bounce, source_ip)
     end
   rescue StandardError => e
     # Don't let SMTP analysis errors break the main flow
@@ -281,41 +300,42 @@ class SMTPSender < BaseSender
   # @param smtp_code [String] The SMTP code
   # @param smtp_message [String] The full SMTP error message
   # @param soft_bounce [Boolean] Whether this is a soft bounce
+  # @param source_ip [IPAddress] The source IP address (either from @source_ip_address or extracted)
   #
-  def handle_blacklist_detected_in_smtp(parsed, smtp_code, smtp_message, soft_bounce)
+  def handle_blacklist_detected_in_smtp(parsed, smtp_code, smtp_message, soft_bounce, source_ip)
     logger.warn "[SMTP BLACKLIST] Detected #{parsed[:severity]} severity blacklist indicator: #{parsed[:description]}"
 
     if soft_bounce
       # Track soft bounces and check threshold
       tracker = IPBlacklist::SoftBounceTracker.new(
-        ip_address_id: @source_ip_address.id,
+        ip_address_id: source_ip.id,
         destination_domain: @domain,
         threshold: smtp_soft_bounce_threshold,
         window_minutes: smtp_soft_bounce_window
       )
 
       if tracker.record_and_check_threshold
-        logger.warn "[SMTP BLACKLIST] Soft bounce threshold exceeded for IP #{@source_ip_address.ipv4} on domain #{@domain}"
+        logger.warn "[SMTP BLACKLIST] Soft bounce threshold exceeded for IP #{source_ip.ipv4} on domain #{@domain}"
         IPBlacklist::IPHealthManager.handle_excessive_soft_bounces(
-          @source_ip_address,
+          source_ip,
           @domain,
           reason: "Soft bounce threshold exceeded: #{parsed[:description]}"
         )
       else
-        logger.info "[SMTP BLACKLIST] Soft bounce recorded (#{tracker.current_count}/#{tracker.threshold}) for IP #{@source_ip_address.ipv4} on domain #{@domain}"
+        logger.info "[SMTP BLACKLIST] Soft bounce recorded (#{tracker.current_count}/#{tracker.threshold}) for IP #{source_ip.ipv4} on domain #{@domain}"
       end
     elsif parsed[:severity] == "high"
       # Hard bounce - take immediate action if severity is high
-      logger.warn "[SMTP BLACKLIST] High severity hard bounce - pausing IP #{@source_ip_address.ipv4} for domain #{@domain}"
+      logger.warn "[SMTP BLACKLIST] High severity hard bounce - pausing IP #{source_ip.ipv4} for domain #{@domain}"
       IPBlacklist::IPHealthManager.handle_smtp_rejection(
-        @source_ip_address,
+        source_ip,
         @domain,
         parsed,
         smtp_code,
         smtp_message
       )
     else
-      logger.info "[SMTP BLACKLIST] #{parsed[:severity].capitalize} severity hard bounce detected for IP #{@source_ip_address.ipv4} - monitoring"
+      logger.info "[SMTP BLACKLIST] #{parsed[:severity].capitalize} severity hard bounce detected for IP #{source_ip.ipv4} - monitoring"
     end
   end
 
@@ -328,6 +348,73 @@ class SMTPSender < BaseSender
     # SMTP codes are typically 3 digits at the start of the message
     match = message.match(/^(\d{3})/)
     match ? match[1] : nil
+  end
+
+  # Extract IP address from SMTP error message
+  #
+  # @param message [String] The SMTP error message
+  # @return [String, nil] The extracted IP address (IPv4 or IPv6)
+  #
+  def extract_ip_from_smtp_message(message)
+    return nil if message.blank?
+
+    # Pattern 1: IP in square brackets [1.2.3.4] or [2001:db8::1]
+    # Common in Microsoft/Outlook errors: "messages from [209.227.233.135] weren't sent"
+    if match = message.match(/\[([0-9a-fA-F:.]+)\]/)
+      ip = match[1]
+      return ip if valid_ip_format?(ip)
+    end
+
+    # Pattern 2: IP after "from" keyword
+    # Example: "from 1.2.3.4" or "from IP 1.2.3.4"
+    if match = message.match(/from\s+(?:IP\s+)?([0-9a-fA-F:.]+)/i)
+      ip = match[1]
+      return ip if valid_ip_format?(ip)
+    end
+
+    # Pattern 3: IP after "Client host" or "host"
+    # Example: "Client host 1.2.3.4 rejected"
+    if match = message.match(/(?:Client\s+)?host\s+([0-9a-fA-F:.]+)/i)
+      ip = match[1]
+      return ip if valid_ip_format?(ip)
+    end
+
+    nil
+  end
+
+  # Check if a string looks like a valid IP address (IPv4 or IPv6)
+  #
+  # @param ip [String] The IP string to validate
+  # @return [Boolean] True if it looks like a valid IP
+  #
+  def valid_ip_format?(ip)
+    return false if ip.blank?
+
+    # IPv4: 4 octets separated by dots
+    return true if ip.match?(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)
+
+    # IPv6: contains colons and hex characters
+    return true if ip.match?(/^[0-9a-fA-F:]+$/) && ip.include?(":")
+
+    false
+  end
+
+  # Find IPAddress model by IP string (IPv4 or IPv6)
+  #
+  # @param ip_string [String] The IP address as string
+  # @return [IPAddress, nil] The IPAddress model if found
+  #
+  def find_ip_address_by_ip(ip_string)
+    return nil if ip_string.blank?
+
+    # Try to find by IPv4 or IPv6
+    if ip_string.include?(":")
+      # IPv6
+      IPAddress.find_by(ipv6: ip_string)
+    else
+      # IPv4
+      IPAddress.find_by(ipv4: ip_string)
+    end
   end
 
   # Check if SMTP response analysis is enabled
