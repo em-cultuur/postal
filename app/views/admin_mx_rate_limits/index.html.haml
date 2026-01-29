@@ -1,0 +1,94 @@
+- page_title << "Admin MX Rate Limits Dashboard"
+
+.pageHeader
+  %h1.pageHeader__title MX Rate Limits Dashboard
+  %p.pageHeader__intro System-wide overview of MX rate limiting status across all organizations and servers
+
+.pageContent
+
+  .adminDashboard__totals
+    %h2.adminDashboard__totalsTitle System-Wide MX Rate Limiting Statistics
+
+    .adminDashboard__totalsBoxes
+      .adminDashboard__statsCard.adminDashboard__statsCard--warning
+        .adminDashboard__statsValue= number_with_delimiter @total_active_rate_limits
+        .adminDashboard__statsLabel Active Rate Limits
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--info
+        .adminDashboard__statsValue= number_with_delimiter @total_rate_limits
+        .adminDashboard__statsLabel Total Rate Limits
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--critical
+        .adminDashboard__statsValue= format_delay_human(@total_max_delay)
+        .adminDashboard__statsLabel Max Delay
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--danger
+        .adminDashboard__statsValue= number_with_delimiter @total_error_count
+        .adminDashboard__statsLabel Total Errors
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--success
+        .adminDashboard__statsValue= number_with_delimiter @total_success_count
+        .adminDashboard__statsLabel Total Successes
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--info
+        .adminDashboard__statsValue= number_with_delimiter @organizations_with_rate_limits
+        .adminDashboard__statsLabel Organizations Affected
+
+      .adminDashboard__statsCard.adminDashboard__statsCard--info
+        .adminDashboard__statsValue= number_with_delimiter @servers_with_rate_limits
+        .adminDashboard__statsLabel Servers with Active Limits
+
+  %h2.adminDashboard__serversTitle Rate Limits by Organization
+
+  - if @organization_data.empty?
+    .noData
+      %p.noData__title No MX rate limits found
+      %p.noData__text There are currently no MX rate limits active across any organizations.
+
+  - else
+    - @organization_data.each do |org_data|
+      - organization = org_data[:organization]
+
+      %div{style: "margin-bottom: 2rem;"}
+        %h3{style: "margin-bottom: 0.5rem; font-size: 1.2rem;"}
+          = link_to organization.name, organization_root_path(organization)
+          %span{style: "font-size: 0.9rem; color: #666; font-weight: normal; margin-left: 0.5rem;"}
+            Active: #{org_data[:total_active]} | Total: #{org_data[:total_rate_limits]} | Max Delay: #{format_delay_human(org_data[:max_delay])}
+
+        %table.dataTable{style: "font-size: 0.9rem;"}
+          %thead
+            %tr
+              %th Server
+              %th.dataTable__centerCell Active
+              %th.dataTable__centerCell Max Delay
+              %th.dataTable__centerCell Errors
+              %th Top Rate Limited Domains
+          %tbody
+            - org_data[:servers].each do |server_data|
+              - server = server_data[:server]
+              %tr
+                %td
+                  = link_to server.name, organization_server_mx_rate_limits_path(organization, server)
+                %td.dataTable__centerCell
+                  %strong= server_data[:active_count]
+                  %span{style: "color: #999;"} / #{server_data[:total_count]}
+                %td.dataTable__centerCell
+                  %span.mxRateLimitingDashboard__delayBadge{:class => "#{server_data[:max_delay] > 1800 ? 'is-critical' : server_data[:max_delay] > 600 ? 'is-warning' : 'is-normal'}"}
+                    = format_delay_human(server_data[:max_delay])
+                %td.dataTable__centerCell
+                  %span{style: "color: #d52b1e;"}= number_with_delimiter server_data[:error_count]
+                  %span{style: "color: #999;"} / 
+                  %span{style: "color: #68a357;"}= number_with_delimiter server_data[:success_count]
+                %td
+                  - if server_data[:rate_limits].any?
+                    - server_data[:rate_limits].first(3).each_with_index do |rate_limit, idx|
+                      - if idx > 0
+                        %span{style: "color: #ccc; margin: 0 0.3rem;"} |
+                      %code{style: "font-size: 0.85rem;"}= rate_limit.mx_domain
+                      %span.mxRateLimitingDashboard__delayBadge{style: "font-size: 0.75rem; padding: 0.1rem 0.3rem; margin-left: 0.2rem;", :class => "#{rate_limit.current_delay > 1800 ? 'is-critical' : rate_limit.current_delay > 600 ? 'is-warning' : 'is-normal'}"}
+                        = format_delay_human(rate_limit.current_delay)
+                    - if server_data[:rate_limits].size > 3
+                      %span{style: "color: #999; margin-left: 0.5rem; font-style: italic;"}
+                        +#{server_data[:rate_limits].size - 3} more
+                  - else
+                    %span{style: "color: #999; font-style: italic;"} None

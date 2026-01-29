@@ -41,6 +41,7 @@
           %li.siteHeader__navItem= link_to "My Settings", settings_path, :class => 'sideHeader__navItemLink'
           - if current_user.admin?
             %li.siteHeader__navItem= link_to "Admin Dashboard", admin_dashboard_path, :class => 'sideHeader__navItemLink'
+            %li.siteHeader__navItem= link_to "MX Rate Limits", admin_mx_rate_limits_path, :class => 'sideHeader__navItemLink'
             - if Postal.ip_pools?
               %li.siteHeader__navItem= link_to "IP Pools", ip_pools_path, :class => 'sideHeader__navItemLink'
               %li.siteHeader__navItem= link_to "IP Reputation", dashboard_ip_reputation_index_path, :class => 'sideHeader__navItemLink'

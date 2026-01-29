@@ -95,6 +95,7 @@ Rails.application.routes.draw do
 
   # Admin Dashboard
   get "admin/dashboard" => "admin_dashboard#index", as: "admin_dashboard"
+  get "admin/mx_rate_limits" => "admin_mx_rate_limits#index", as: "admin_mx_rate_limits"
 
   # IP Reputation Management (Phase 8)
   resources :ip_reputation, only: [:index] do
