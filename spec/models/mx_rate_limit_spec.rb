@@ -461,6 +461,73 @@ RSpec.describe MXRateLimit do
     end
   end
 
+  describe "destroying rate limits and associated events" do
+    let(:rate_limit) { create(:mx_rate_limit, server: server, mx_domain: "test.com") }
+
+    before do
+      # Create some events for this rate limit
+      3.times do |i|
+        MXRateLimitEvent.create!(
+          server_id: rate_limit.server_id,
+          mx_domain: rate_limit.mx_domain,
+          event_type: "error",
+          delay_before: i * 100,
+          delay_after: (i + 1) * 100,
+          created_at: i.hours.ago
+        )
+      end
+    end
+
+    it "deletes associated events when rate limit is manually destroyed" do
+      expect do
+        rate_limit.destroy
+      end.to change { MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain).count }.from(3).to(0)
+    end
+
+    it "deletes associated events when rate limit is cleaned up by cleanup_inactive" do
+      rate_limit.update(current_delay: 0, last_success_at: 25.hours.ago)
+
+      expect do
+        MXRateLimit.cleanup_inactive
+      end.to change { MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain).count }.from(3).to(0)
+    end
+
+    it "deletes associated events when rate limit is cleaned up by cleanup_abandoned" do
+      rate_limit.update(current_delay: 300, last_success_at: 3.days.ago)
+
+      expect do
+        MXRateLimit.cleanup_abandoned
+      end.to change { MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain).count }.from(3).to(0)
+    end
+
+    it "does not delete events for other rate limits" do
+      other_rate_limit = create(:mx_rate_limit, server: server, mx_domain: "other.com")
+      other_event = MXRateLimitEvent.create!(
+        server_id: other_rate_limit.server_id,
+        mx_domain: other_rate_limit.mx_domain,
+        event_type: "success"
+      )
+
+      rate_limit.destroy
+
+      expect(MXRateLimitEvent.exists?(other_event.id)).to be true
+    end
+
+    it "does not delete events for same mx_domain but different server" do
+      other_server = create(:server, organization: organization, name: "other-server-#{SecureRandom.hex(4)}")
+      other_rate_limit = create(:mx_rate_limit, server: other_server, mx_domain: rate_limit.mx_domain)
+      other_event = MXRateLimitEvent.create!(
+        server_id: other_rate_limit.server_id,
+        mx_domain: other_rate_limit.mx_domain,
+        event_type: "success"
+      )
+
+      rate_limit.destroy
+
+      expect(MXRateLimitEvent.exists?(other_event.id)).to be true
+    end
+  end
+
   describe "#allow_probe?" do
     let(:rate_limit) { create(:mx_rate_limit, server: server, mx_domain: "google.com") }
 

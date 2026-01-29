@@ -40,6 +40,9 @@ class MXRateLimit < ApplicationRecord
 
   belongs_to :server
 
+  # Delete associated events when rate limit is destroyed
+  before_destroy :delete_associated_events
+
   # Events are associated by server_id and mx_domain (no direct foreign key)
   # Use MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain)
   # to query events for this rate limit
@@ -124,10 +127,13 @@ class MXRateLimit < ApplicationRecord
     deleted_count = 0
 
     # Cleanup inactive rate limits (delay=0)
+    # Use destroy_all to trigger callbacks and clean up associated events
     cleanup_hours = Postal::Config.postal.mx_rate_limiting_inactive_cleanup_hours
-    deleted_count += inactive
-                     .where("last_success_at < ?", cleanup_hours.hours.ago)
-                     .delete_all
+    inactive_records = inactive
+                       .where("last_success_at < ?", cleanup_hours.hours.ago)
+                       .to_a
+    deleted_count += inactive_records.size
+    inactive_records.each(&:destroy)
 
     # Cleanup abandoned active rate limits (delay>0 but no recent activity)
     deleted_count += cleanup_abandoned
@@ -314,6 +320,16 @@ class MXRateLimit < ApplicationRecord
 
     time_since_last_attempt = Time.current - last_error_at
     time_since_last_attempt >= current_delay
+  end
+
+  private
+
+  # Delete all associated events when the rate limit is destroyed
+  # This callback ensures events don't become orphaned
+  #
+  # @return [void]
+  def delete_associated_events
+    events.delete_all
   end
 
 end
