@@ -58,7 +58,16 @@ class QueuedMessage < ApplicationRecord
     pool = server.ip_pool_for_message(message)
     return if pool.nil?
 
-    self.ip_address = pool.ip_addresses.select_by_priority
+    # Extract destination domain from the queued message
+    destination_domain = domain || extract_domain_from_message
+
+    # Use domain-aware IP selection that respects blacklists and warmup status
+    if destination_domain.present?
+      self.ip_address = pool.ip_addresses.select_by_priority_for_domain(destination_domain)
+    else
+      # Fallback to basic priority selection if domain cannot be determined
+      self.ip_address = pool.ip_addresses.select_by_priority
+    end
   end
 
   # Reallocate a different IP address for retry attempts (e.g., after a SoftFail).
@@ -120,6 +129,17 @@ class QueuedMessage < ApplicationRecord
     return nil unless mx_domain.present?
 
     MXRateLimit.find_by(server: server, mx_domain: mx_domain)
+  end
+
+  private
+
+  def extract_domain_from_message
+    # Try to extract domain from message recipient if domain field is not set
+    return nil unless message
+
+    return unless message.respond_to?(:rcpt_to) && message.rcpt_to.present?
+
+    message.rcpt_to.split("@").last&.downcase
   end
 
 end

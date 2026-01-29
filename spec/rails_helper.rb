@@ -35,6 +35,29 @@ RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods
   config.include GeneralHelpers
 
+  # Stub Config constant for IP reputation feature
+  config.before(:each) do
+    unless defined?(Config)
+      config_double = double("config")
+      allow(config_double).to receive(:notifications).and_return({})
+
+      # Microsoft SNDS config
+      microsoft_snds_config = double("microsoft_snds")
+      allow(microsoft_snds_config).to receive(:[]).with(:api_key).and_return(nil)
+      allow(config_double).to receive(:microsoft_snds).and_return(microsoft_snds_config)
+
+      # Google Postmaster config
+      allow(config_double).to receive(:google_postmaster).and_return({})
+
+      dns_double = double("dns", return_path_domain: "example.com")
+
+      stub_const("Config", double(
+                             ip_reputation: config_double,
+                             dns: dns_double
+                           ))
+    end
+  end
+
   # Before all request specs, set the hostname to the web hostname for
   # Postal otherwise it'll be www.example.com which will fail host
   # authorization checks.

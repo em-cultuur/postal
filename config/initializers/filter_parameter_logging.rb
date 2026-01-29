@@ -7,4 +7,8 @@
 # notations and behaviors.
 Rails.application.config.filter_parameters += [
   :passw, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn,
+  # IP Reputation system sensitive data
+  :smtp_response_message,  # May contain sensitive email content or server details
+  :reason,                 # Admin notes may contain sensitive information
+  :raw_message,           # SMTP error messages may reveal infrastructure details
 ]

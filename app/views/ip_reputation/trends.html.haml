@@ -1,0 +1,114 @@
+- page_title << "IP Reputation"
+- page_title << "Trends"
+
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "IP Reputation", ip_reputation_index_path
+      &rarr;
+    Historical Trends
+
+.pageContent.pageContent--compact
+
+  %p.pageContent__intro.u-margin
+    View historical reputation trends and metrics for all IP addresses over the past 30 days.
+
+  .reputationStats.u-margin
+    .reputationStats__grid
+      .reputationStats__card
+        .reputationStats__cardTitle Average Reputation Score
+        .reputationStats__cardValue= @trends[:avg_reputation_score]&.round(1) || "N/A"
+        .reputationStats__cardSubtext across all IPs
+
+      .reputationStats__card
+        .reputationStats__cardTitle Total Blacklist Events
+        .reputationStats__cardValue= @trends[:total_blacklist_events]
+        .reputationStats__cardSubtext in last 30 days
+
+      .reputationStats__card
+        .reputationStats__cardTitle Average Delivery Rate
+        .reputationStats__cardValue= "#{(@trends[:avg_delivery_rate] || 0).round(1)}%"
+        .reputationStats__cardSubtext across all IPs
+
+      .reputationStats__card
+        .reputationStats__cardTitle Average Bounce Rate
+        .reputationStats__cardValue= "#{(@trends[:avg_bounce_rate] || 0).round(1)}%"
+        .reputationStats__cardSubtext across all IPs
+
+  %h2.sectionTitle Top 10 IP Addresses by Reputation Score
+
+  %table.dataTable.u-margin
+    %thead
+      %tr
+        %th Rank
+        %th IP Address
+        %th Reputation Score
+        %th Delivery Rate
+        %th Bounce Rate
+        %th Spam Rate
+        %th Last Updated
+    %tbody
+      - if @top_ips.empty?
+        %tr
+          %td.dataTable__empty{:colspan => 7} No reputation data available yet.
+      - else
+        - @top_ips.each_with_index do |ip_data, index|
+          %tr
+            %td= index + 1
+            %td= link_to ip_data[:ip].ipv4, reputation_ip_address_path(ip_data[:ip]), :class => "u-link"
+            %td
+              - score = ip_data[:score]
+              - if score >= 90
+                %span.label.label--green= score
+              - elsif score >= 75
+                %span.label.label--blue= score
+              - elsif score >= 60
+                %span.label.label--grey= score
+              - elsif score >= 40
+                %span.label.label--orange= score
+              - else
+                %span.label.label--red= score
+            %td= "#{ip_data[:delivery_rate].round(1)}%"
+            %td= "#{ip_data[:bounce_rate].round(1)}%"
+            %td= "#{ip_data[:spam_rate].round(1)}%"
+            %td= time_ago_in_words(ip_data[:updated_at]) + " ago"
+
+  %h2.sectionTitle Recent Blacklist Activity (Last 30 Days)
+
+  - if @blacklist_activity.empty?
+    .noData.noData--clean
+      %p.noData__text No blacklist events in the last 30 days.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th Date
+          %th New Blacklistings
+          %th Resolved
+          %th Net Change
+      %tbody
+        - @blacklist_activity.each do |day_data|
+          %tr
+            %td= day_data[:date].strftime("%Y-%m-%d")
+            %td
+              - if day_data[:new_count] > 0
+                %span.label.label--red= day_data[:new_count]
+              - else
+                0
+            %td
+              - if day_data[:resolved_count] > 0
+                %span.label.label--green= day_data[:resolved_count]
+              - else
+                0
+            %td
+              - net = day_data[:new_count] - day_data[:resolved_count]
+              - if net > 0
+                %span.label.label--red= "+#{net}"
+              - elsif net < 0
+                %span.label.label--green= net
+              - else
+                0
+
+  .buttonSet.u-margin
+    = link_to "Back to Dashboard", dashboard_ip_reputation_index_path, :class => "button"
+    = link_to "View Health Status", health_ip_reputation_index_path, :class => "button"

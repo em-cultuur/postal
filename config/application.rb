@@ -55,5 +55,17 @@ module Postal
       config.logger = Logger.new("/dev/null")
     end
 
+    # Security: Configure security headers to protect against common attacks
+    config.action_dispatch.default_headers.merge!(
+      # Prevent clickjacking by only allowing same-origin framing
+      "X-Frame-Options" => "SAMEORIGIN",
+      # Prevent MIME type sniffing
+      "X-Content-Type-Options" => "nosniff",
+      # Enable XSS protection in older browsers (modern CSP is preferred)
+      "X-XSS-Protection" => "1; mode=block",
+      # Control referrer information sent with requests
+      "Referrer-Policy" => "strict-origin-when-cross-origin"
+    )
+
   end
 end

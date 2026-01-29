@@ -97,6 +97,9 @@ class SMTPSender < BaseSender
     logger.error "#{e.class}: #{e.message}"
     @current_endpoint.reset_smtp_session
 
+    # Parse SMTP response for blacklist detection (soft bounce)
+    handle_smtp_error_response(e, soft_bounce: true)
+
     create_result("SoftFail", start_time) do |r|
       r.details = "Temporary SMTP delivery error when sending to #{@current_endpoint}"
       r.output = e.message
@@ -118,6 +121,9 @@ class SMTPSender < BaseSender
   rescue Net::SMTPFatalError => e
     logger.error "#{e.class}: #{e.message}"
     @current_endpoint.reset_smtp_session
+
+    # Parse SMTP response for blacklist detection (hard bounce)
+    handle_smtp_error_response(e, soft_bounce: false)
 
     create_result("HardFail", start_time) do |r|
       r.details = "Permanent SMTP delivery error when sending to #{@current_endpoint}"
@@ -192,7 +198,7 @@ class SMTPSender < BaseSender
     # Add this endpoint to the list of endpoints that we have attempted to connect to
     @endpoints << endpoint unless @endpoints.include?(endpoint)
 
-    logger.info "SMTP connect to: #{endpoint.to_s}"
+    logger.info "SMTP connect to: #{endpoint}"
     logger.info "SMTP HELO/EHLO: #{@source_ip_address ? @source_ip_address.hostname : endpoint.class.default_helo_hostname}"
 
     endpoint.start_smtp_session(allow_ssl: allow_ssl, source_ip_address: @source_ip_address)
@@ -213,7 +219,7 @@ class SMTPSender < BaseSender
     end
 
     # Otherwise, just log the connection error and return false
-    logger.error "Cannot connect to #{endpoint} (#{e.class}: #{e.message}) from #{@source_ip_address.nil? ? 'default IP': @source_ip_address.ipv4}"
+    logger.error "Cannot connect to #{endpoint} (#{e.class}: #{e.message}) from #{@source_ip_address.nil? ? 'default IP' : @source_ip_address.ipv4}"
     @connection_errors << e.message unless @connection_errors.include?(e.message)
 
     false
@@ -243,6 +249,129 @@ class SMTPSender < BaseSender
     @logger ||= Postal.logger.create_tagged_logger(log_id: @log_id)
   end
 
+  # Handle SMTP error responses and check for blacklist indicators
+  #
+  # @param exception [Exception] The SMTP exception
+  # @param soft_bounce [Boolean] Whether this is a soft bounce
+  #
+  def handle_smtp_error_response(exception, soft_bounce:)
+    return unless @source_ip_address # Only process if we have an IP address
+    return unless smtp_response_analysis_enabled? # Check if feature is enabled
+
+    # Extract SMTP code from exception message
+    smtp_code = extract_smtp_code(exception.message)
+    return unless smtp_code
+
+    # Parse the SMTP response
+    parsed = IPBlacklist::SmtpResponseParser.parse(exception.message, smtp_code)
+
+    # Handle based on blacklist detection and bounce type
+    if parsed[:blacklist_detected]
+      handle_blacklist_detected_in_smtp(parsed, smtp_code, exception.message, soft_bounce)
+    end
+  rescue StandardError => e
+    # Don't let SMTP analysis errors break the main flow
+    logger.error "[SMTP ANALYSIS ERROR] #{e.class}: #{e.message}"
+    logger.error e.backtrace.join("\n")
+  end
+
+  # Handle blacklist detection from SMTP response
+  #
+  # @param parsed [Hash] Parsed SMTP response
+  # @param smtp_code [String] The SMTP code
+  # @param smtp_message [String] The full SMTP error message
+  # @param soft_bounce [Boolean] Whether this is a soft bounce
+  #
+  def handle_blacklist_detected_in_smtp(parsed, smtp_code, smtp_message, soft_bounce)
+    logger.warn "[SMTP BLACKLIST] Detected #{parsed[:severity]} severity blacklist indicator: #{parsed[:description]}"
+
+    if soft_bounce
+      # Track soft bounces and check threshold
+      tracker = IPBlacklist::SoftBounceTracker.new(
+        ip_address_id: @source_ip_address.id,
+        destination_domain: @domain,
+        threshold: smtp_soft_bounce_threshold,
+        window_minutes: smtp_soft_bounce_window
+      )
+
+      if tracker.record_and_check_threshold
+        logger.warn "[SMTP BLACKLIST] Soft bounce threshold exceeded for IP #{@source_ip_address.ipv4} on domain #{@domain}"
+        IPBlacklist::IPHealthManager.handle_excessive_soft_bounces(
+          @source_ip_address,
+          @domain,
+          reason: "Soft bounce threshold exceeded: #{parsed[:description]}"
+        )
+      else
+        logger.info "[SMTP BLACKLIST] Soft bounce recorded (#{tracker.current_count}/#{tracker.threshold}) for IP #{@source_ip_address.ipv4} on domain #{@domain}"
+      end
+    elsif parsed[:severity] == "high"
+      # Hard bounce - take immediate action if severity is high
+      logger.warn "[SMTP BLACKLIST] High severity hard bounce - pausing IP #{@source_ip_address.ipv4} for domain #{@domain}"
+      IPBlacklist::IPHealthManager.handle_smtp_rejection(
+        @source_ip_address,
+        @domain,
+        parsed,
+        smtp_code,
+        smtp_message
+      )
+    else
+      logger.info "[SMTP BLACKLIST] #{parsed[:severity].capitalize} severity hard bounce detected for IP #{@source_ip_address.ipv4} - monitoring"
+    end
+  end
+
+  # Extract SMTP code from error message
+  #
+  # @param message [String] The error message
+  # @return [String, nil] The SMTP code (e.g., "550", "421")
+  #
+  def extract_smtp_code(message)
+    # SMTP codes are typically 3 digits at the start of the message
+    match = message.match(/^(\d{3})/)
+    match ? match[1] : nil
+  end
+
+  # Check if SMTP response analysis is enabled
+  #
+  # @return [Boolean]
+  #
+  def smtp_response_analysis_enabled?
+    # Check configuration - default to true if not specified
+    return true unless Postal::Config.postal.respond_to?(:ip_reputation)
+
+    config = Postal::Config.postal.ip_reputation
+    return true unless config.respond_to?(:smtp_response_analysis)
+
+    config.smtp_response_analysis.enabled != false
+  rescue StandardError
+    true # Default to enabled if config access fails
+  end
+
+  # Get soft bounce threshold from config
+  #
+  # @return [Integer]
+  #
+  def smtp_soft_bounce_threshold
+    return IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD unless Postal::Config.postal.respond_to?(:ip_reputation)
+
+    config = Postal::Config.postal.ip_reputation&.smtp_response_analysis
+    config&.soft_bounce_threshold || IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD
+  rescue StandardError
+    IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD
+  end
+
+  # Get soft bounce window from config
+  #
+  # @return [Integer]
+  #
+  def smtp_soft_bounce_window
+    return IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES unless Postal::Config.postal.respond_to?(:ip_reputation)
+
+    config = Postal::Config.postal.ip_reputation&.smtp_response_analysis
+    config&.soft_bounce_window_minutes || IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES
+  rescue StandardError
+    IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES
+  end
+
   # Check if the error message indicates that domain-level throttling is required
   #
   # @param message [String] the SMTP error message
@@ -259,7 +388,7 @@ class SMTPSender < BaseSender
     throttle_patterns = [
       /\b451\b.*\b(too many|rate limit|slow down|try again later|temporarily deferred)/i,
       /\b(too many messages|too many connections|rate limit|sending rate|slow down)\b/i,
-      /\b(temporarily rejected|temporarily deferred|try again later)\b.*\b(rate|limit|too many)/i
+      /\b(temporarily rejected|temporarily deferred|try again later)\b.*\b(rate|limit|too many)/i,
     ]
 
     throttle_patterns.any? { |pattern| message.match?(pattern) }

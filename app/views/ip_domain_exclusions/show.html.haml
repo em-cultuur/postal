@@ -1,0 +1,150 @@
+- page_title << "Domain Exclusions"
+- page_title << @exclusion.destination_domain
+
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "Domain Exclusions", ip_domain_exclusions_path
+      &rarr;
+    = "#{@exclusion.ip_address.ipv4} / #{@exclusion.destination_domain}"
+
+.pageContent.pageContent--compact
+
+  %h2.sectionTitle Exclusion Details
+
+  %table.dataTable.u-margin
+    %tbody
+      %tr
+        %th{:width => "30%"} IP Address
+        %td= link_to @exclusion.ip_address.ipv4, reputation_ip_address_path(@exclusion.ip_address), :class => "u-link"
+      %tr
+        %th Destination Domain
+        %td= @exclusion.destination_domain
+      %tr
+        %th Status
+        %td
+          - if @exclusion.paused?
+            %span.label.label--red Paused
+          - elsif @exclusion.warming?
+            %span.label.label--orange Warming Up
+          - else
+            %span.label.label--green Active
+      %tr
+        %th Warmup Stage
+        %td
+          - if @exclusion.warmup_stage == 0
+            %span.label.label--red Stage 0 - Completely Paused
+          - elsif @exclusion.warmup_stage == 1
+            %span.label.label--orange Stage 1 - 20% Priority (2 days)
+          - elsif @exclusion.warmup_stage == 2
+            %span.label.label--orange Stage 2 - 40% Priority (3 days)
+          - elsif @exclusion.warmup_stage == 3
+            %span.label.label--blue Stage 3 - 60% Priority (3 days)
+          - elsif @exclusion.warmup_stage == 4
+            %span.label.label--blue Stage 4 - 80% Priority (4 days)
+          - elsif @exclusion.warmup_stage == 5
+            %span.label.label--green Stage 5 - Full Recovery (100%)
+          - else
+            = "Stage #{@exclusion.warmup_stage}"
+      %tr
+        %th Current Priority
+        %td
+          %strong= "#{@exclusion.current_priority}%"
+          %br
+          %small Messages to this domain are sent with #{@exclusion.current_priority}% priority
+      %tr
+        %th Exclusion Created
+        %td
+          = @exclusion.created_at.strftime("%Y-%m-%d %H:%M:%S")
+          %br
+          %small= "(#{time_ago_in_words(@exclusion.created_at)} ago)"
+      %tr
+        %th Next Warmup Scheduled
+        %td
+          - if @exclusion.next_warmup_at && @exclusion.next_warmup_at > Time.current
+            = @exclusion.next_warmup_at.strftime("%Y-%m-%d %H:%M:%S")
+            %br
+            %small= "(in #{time_ago_in_words(@exclusion.next_warmup_at)})"
+          - elsif @exclusion.paused?
+            Not scheduled - currently paused
+          - elsif @exclusion.fully_recovered?
+            Fully recovered - no more warmup needed
+          - else
+            N/A
+      %tr
+        %th Updated At
+        %td= @exclusion.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+
+  - if @related_blacklist
+    %h2.sectionTitle Related Blacklist Record
+
+    %table.dataTable.u-margin
+      %tbody
+        %tr
+          %th{:width => "30%"} Blacklist Name
+          %td= link_to @related_blacklist.blacklist_source, ip_blacklist_record_path(@related_blacklist), :class => "u-link"
+        %tr
+          %th Status
+          %td
+            - if @related_blacklist.resolved?
+              %span.label.label--green Resolved
+            - elsif @related_blacklist.ignored?
+              %span.label.label--grey Ignored
+            - else
+              %span.label.label--red Active
+        %tr
+          %th Detected At
+          %td= @related_blacklist.detected_at.strftime("%Y-%m-%d %H:%M:%S")
+
+  %h2.sectionTitle Warmup Progress
+
+  - if @exclusion.warmup_stage == 0
+    %p.u-margin
+      This IP is currently
+      %strong paused
+      for #{@exclusion.destination_domain}. No messages will be sent to this domain
+      until the exclusion is unpaused or removed.
+
+  - elsif @exclusion.warmup_stage == 5
+    %p.u-margin
+      This IP has
+      %strong fully recovered
+      and is sending at 100% priority to #{@exclusion.destination_domain}.
+      The exclusion can be removed to clean up records.
+
+  - else
+    .warmupProgress.u-margin
+      .warmupProgress__bar
+        .warmupProgress__fill{:style => "width: #{@exclusion.current_priority}%"}
+      .warmupProgress__label= "#{@exclusion.current_priority}% Priority - Stage #{@exclusion.warmup_stage} of 4"
+
+    %p.u-margin
+      This IP is currently in
+      %strong Stage #{@exclusion.warmup_stage}
+      of the warmup process. It will remain at #{@exclusion.current_priority}% priority
+      - stage_config = IPDomainExclusion::WARMUP_STAGES[@exclusion.warmup_stage]
+      - if stage_config[:duration]
+        for #{distance_of_time_in_words(stage_config[:duration])}
+        before advancing to the next stage.
+      - else
+        indefinitely.
+
+  %h2.sectionTitle Actions
+
+  .buttonSet.u-margin
+    - if @exclusion.paused?
+      = link_to "Unpause & Start Warmup", unpause_ip_address_path(@exclusion.ip_address, destination_domain: @exclusion.destination_domain, start_warmup: true), :method => :post, :class => "button button--positive", :data => {:confirm => "Start sending to this domain with warmup (Stage 1)?"}
+      = link_to "Unpause at Full Capacity", unpause_ip_address_path(@exclusion.ip_address, destination_domain: @exclusion.destination_domain), :method => :post, :class => "button button--warning", :data => {:confirm => "Start sending at full capacity? Use with caution."}
+    - elsif @exclusion.warming?
+      - if @exclusion.warmup_stage < 5
+        = link_to "Advance to Next Stage", advance_warmup_ip_address_path(@exclusion.ip_address, destination_domain: @exclusion.destination_domain), :method => :post, :class => "button button--primary", :data => {:confirm => "Manually advance to Stage #{@exclusion.warmup_stage + 1}?"}
+      - if @exclusion.warmup_stage > 1
+        = link_to "Decrease Stage", adjust_stage_ip_domain_exclusion_path(@exclusion, direction: 'down'), :method => :post, :class => "button", :data => {:confirm => "Decrease warmup stage to #{@exclusion.warmup_stage - 1}?"}
+      = link_to "Reset to Stage 0", reset_warmup_ip_address_path(@exclusion.ip_address, destination_domain: @exclusion.destination_domain), :method => :post, :class => "button button--danger", :data => {:confirm => "Reset warmup and pause sending?"}
+
+    - if @exclusion.warmup_stage == 5
+      = link_to "Remove Exclusion", remove_ip_domain_exclusion_path(@exclusion), :method => :delete, :class => "button button--positive", :data => {:confirm => "Remove this exclusion record? IP will send at full capacity."}
+
+  .buttonSet.u-margin
+    = link_to "Back to Exclusions", ip_domain_exclusions_path, :class => "button"
+    = link_to "View IP Reputation", reputation_ip_address_path(@exclusion.ip_address), :class => "button"

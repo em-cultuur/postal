@@ -93,6 +93,42 @@ Rails.application.routes.draw do
     resources :ip_addresses
   end
 
+  # IP Reputation Management (Phase 8)
+  resources :ip_reputation, only: [:index] do
+    collection do
+      get :dashboard
+      get :health
+      get :trends
+    end
+  end
+
+  resources :ip_addresses, only: [] do
+    member do
+      get :reputation
+      post :pause
+      post :unpause
+      post :advance_warmup
+      post :reset_warmup
+    end
+  end
+
+  resources :ip_blacklist_records, only: [:index, :show] do
+    member do
+      post :resolve
+      post :ignore
+      post :recheck
+    end
+  end
+
+  resources :ip_domain_exclusions, only: [:index, :show] do
+    member do
+      post :remove
+      post :adjust_stage
+    end
+  end
+
+  resources :ip_health_actions, only: [:index, :show]
+
   get "settings" => "user#edit"
   patch "settings" => "user#update"
   post "persist" => "sessions#persist"

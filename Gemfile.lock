@@ -111,6 +111,7 @@ GEM
       bigdecimal
       rexml
     crass (1.0.6)
+    csv (3.3.5)
     database_cleaner-active_record (2.2.2)
       activerecord (>= 5.a)
       database_cleaner-core (~> 2.0)
@@ -442,6 +443,7 @@ DEPENDENCIES
   bcrypt
   chronic
   coffee-rails (~> 5.0)
+  csv
   database_cleaner-active_record
   domain_name
   dotenv

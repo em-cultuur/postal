@@ -1,0 +1,109 @@
+- page_title << "Health Actions"
+
+.pageHeader
+  %h1.pageHeader__title Health Actions Audit Log
+
+.pageContent.pageContent--compact
+
+  %p.pageContent__intro.u-margin
+    This audit log shows all health actions taken on IP addresses, both automatic
+    (system-triggered) and manual (user-initiated). Use filters to narrow down results.
+
+  - if params[:action_type].present? || params[:ip_address_id].present? || params[:user_id].present?
+    %p.u-margin
+      %strong Active Filters:
+      - if params[:action_type].present?
+        Action: #{params[:action_type].humanize}
+      - if params[:ip_address_id].present?
+        IP: #{@ip_addresses.find { |ip| ip.id.to_s == params[:ip_address_id] }&.ipv4}
+      - if params[:user_id].present?
+        User: #{@users.find { |u| u.id.to_s == params[:user_id] }&.name}
+      = link_to "Clear filters", ip_health_actions_path, :class => "u-link u-link--small"
+
+  - if @stats[:total_count] > 0
+    .reputationStats.u-margin
+      .reputationStats__grid
+        .reputationStats__card
+          .reputationStats__cardTitle Total Actions
+          .reputationStats__cardValue= @stats[:total_count]
+          .reputationStats__cardSubtext recorded
+
+        .reputationStats__card
+          .reputationStats__cardTitle System Actions
+          .reputationStats__cardValue= @stats[:system_actions]
+          .reputationStats__cardSubtext automatic
+
+        .reputationStats__card
+          .reputationStats__cardTitle Manual Actions
+          .reputationStats__cardValue= @stats[:manual_actions]
+          .reputationStats__cardSubtext user-initiated
+
+        .reputationStats__card
+          .reputationStats__cardTitle Last 24h
+          .reputationStats__cardValue= @stats[:last_24h]
+          .reputationStats__cardSubtext recent actions
+
+  %table.dataTable.u-margin
+    %thead
+      %tr
+        %th Time
+        %th IP Address
+        %th Action Type
+        %th Domain
+        %th Reason
+        %th User
+        %th Details
+    %tbody
+      - if @actions.empty?
+        %tr
+          %td.dataTable__empty{:colspan => 7}
+            - if params[:action_type].present? || params[:ip_address_id].present? || params[:user_id].present?
+              No health actions match the current filters.
+            - else
+              No health actions recorded yet.
+      - else
+        - @actions.each do |action|
+          %tr
+            %td
+              = action.created_at.strftime("%Y-%m-%d")
+              %br
+              %small= action.created_at.strftime("%H:%M:%S")
+            %td= link_to action.ip_address.ipv4, reputation_ip_address_path(action.ip_address), :class => "u-link"
+            %td
+              - case action.action_type
+              - when 'PAUSE'
+                %span.label.label--orange Pause
+              - when 'UNPAUSE'
+                %span.label.label--green Unpause
+              - when 'WARMUP_STAGE_ADVANCE'
+                %span.label.label--blue Warmup Advance
+              - when 'PRIORITY_CHANGE'
+                %span.label.label--grey Priority Change
+              - when 'ROTATE'
+                %span.label.label--purple Rotate
+              - when 'MONITOR'
+                %span.label.label--grey Monitor
+              - when 'MANUAL_OVERRIDE'
+                %span.label.label--red Manual Override
+              - else
+                = action.action_type
+            %td= action.destination_domain || "All"
+            %td= truncate(action.reason, :length => 40)
+            %td
+              - if action.user
+                %span.label.label--blue= action.user.name
+              - else
+                %span.label.label--grey System
+            %td.dataTable__actions
+              = link_to "View", ip_health_action_path(action), :class => "u-link u-link--small"
+
+  - if @total_pages > 1
+    .pagination.u-margin
+      - if @page > 1
+        = link_to "Previous", ip_health_actions_path(page: @page - 1, action_type: params[:action_type], ip_address_id: params[:ip_address_id], user_id: params[:user_id]), :class => "pagination__link"
+      %span.pagination__info Page #{@page} of #{@total_pages}
+      - if @page < @total_pages
+        = link_to "Next", ip_health_actions_path(page: @page + 1, action_type: params[:action_type], ip_address_id: params[:ip_address_id], user_id: params[:user_id]), :class => "pagination__link"
+
+  .buttonSet.u-margin
+    = link_to "Back to Dashboard", dashboard_ip_reputation_index_path, :class => "button"

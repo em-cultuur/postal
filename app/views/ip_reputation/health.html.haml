@@ -1,0 +1,94 @@
+- page_title << "IP Reputation"
+- page_title << "Health Status"
+
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "IP Reputation", ip_reputation_index_path
+      &rarr;
+    Health Status
+
+.pageContent.pageContent--compact
+
+  %p.pageContent__intro.u-margin
+    This page shows the current health status of all IP addresses in your pools,
+    including reputation scores, active blacklistings, and warmup stages.
+
+  - if params[:status].present? || params[:ip_pool_id].present?
+    %p.u-margin
+      %strong Active Filters:
+      - if params[:status].present?
+        Status: #{params[:status].humanize}
+      - if params[:ip_pool_id].present?
+        IP Pool: #{@ip_pools.find { |p| p.id.to_s == params[:ip_pool_id] }&.name}
+      = link_to "Clear filters", health_ip_reputation_index_path, :class => "u-link u-link--small"
+
+  %table.dataTable.u-margin
+    %thead
+      %tr
+        %th IP Address
+        %th IP Pool
+        %th Reputation Score
+        %th Active Blacklists
+        %th Warming Domains
+        %th Last Checked
+        %th Actions
+    %tbody
+      - if @ips.empty?
+        %tr
+          %td.dataTable__empty{:colspan => 7}
+            - if params[:status].present? || params[:ip_pool_id].present?
+              No IP addresses match the current filters.
+            - else
+              No IP addresses configured yet.
+      - else
+        - for ip in @ips
+          %tr
+            %td= link_to ip.ipv4, reputation_ip_address_path(ip), :class => "u-link"
+            %td= ip.ip_pool&.name || "N/A"
+            %td
+              - score = ip.ip_reputation_metrics.order(created_at: :desc).first&.reputation_score
+              - if score
+                - if score >= 90
+                  %span.label.label--green= "#{score} - Excellent"
+                - elsif score >= 75
+                  %span.label.label--blue= "#{score} - Good"
+                - elsif score >= 60
+                  %span.label.label--grey= "#{score} - Fair"
+                - elsif score >= 40
+                  %span.label.label--orange= "#{score} - Poor"
+                - else
+                  %span.label.label--red= "#{score} - Critical"
+              - else
+                %span.label.label--grey No data
+            %td
+              - active_count = ip.ip_blacklist_records.active.count
+              - if active_count > 0
+                %span.label.label--red= active_count
+              - else
+                %span.label.label--green 0
+            %td
+              - warming_count = ip.ip_domain_exclusions.warming.count
+              - if warming_count > 0
+                %span.label.label--orange= warming_count
+              - else
+                0
+            %td
+              - last_metric = ip.ip_reputation_metrics.order(created_at: :desc).first
+              - if last_metric
+                = time_ago_in_words(last_metric.created_at) + " ago"
+              - else
+                Never
+            %td.dataTable__actions
+              = link_to "View", reputation_ip_address_path(ip), :class => "u-link u-link--small"
+
+  - if @total_pages > 1
+    .pagination.u-margin
+      - if @page > 1
+        = link_to "Previous", health_ip_reputation_index_path(page: @page - 1, status: params[:status], ip_pool_id: params[:ip_pool_id]), :class => "pagination__link"
+      %span.pagination__info Page #{@page} of #{@total_pages}
+      - if @page < @total_pages
+        = link_to "Next", health_ip_reputation_index_path(page: @page + 1, status: params[:status], ip_pool_id: params[:ip_pool_id]), :class => "pagination__link"
+
+  .buttonSet.u-margin
+    = link_to "Back to Dashboard", dashboard_ip_reputation_index_path, :class => "button"

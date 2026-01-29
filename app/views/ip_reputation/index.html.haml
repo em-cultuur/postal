@@ -1,0 +1,44 @@
+- page_title << "IP Reputation"
+
+.pageHeader
+  %h1.pageHeader__title IP Reputation Management
+
+.pageContent.pageContent--compact
+
+  %p.pageContent__intro.u-margin
+    Manage and monitor the reputation of your IP addresses. Track blacklistings,
+    warmup progress, and health metrics across all your mail servers.
+
+  %ul.largeList.u-margin
+    %li.largeList__item
+      = link_to dashboard_ip_reputation_index_path, :class => 'largeList__link' do
+        %strong Dashboard
+        %p.largeList__subText View overall statistics, recent blacklist events, and health actions
+
+    %li.largeList__item
+      = link_to health_ip_reputation_index_path, :class => 'largeList__link' do
+        %strong IP Health Status
+        %p.largeList__subText Monitor reputation scores and health status for all IP addresses
+
+    %li.largeList__item
+      = link_to trends_ip_reputation_index_path, :class => 'largeList__link' do
+        %strong Historical Trends
+        %p.largeList__subText View reputation trends and metrics over time
+
+    %li.largeList__item
+      = link_to ip_blacklist_records_path, :class => 'largeList__link' do
+        %strong Blacklist Records
+        %p.largeList__subText View and manage detected blacklist events
+
+    %li.largeList__item
+      = link_to ip_domain_exclusions_path, :class => 'largeList__link' do
+        %strong Domain Exclusions & Warmup
+        %p.largeList__subText Manage paused IPs and warmup progress for specific domains
+
+    %li.largeList__item
+      = link_to ip_health_actions_path, :class => 'largeList__link' do
+        %strong Health Actions Audit Log
+        %p.largeList__subText View complete history of all health actions (automatic and manual)
+
+  .buttonSet.u-margin
+    = link_to "Go to Dashboard", dashboard_ip_reputation_index_path, :class => "button button--positive"

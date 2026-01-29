@@ -4,6 +4,9 @@ require "authie/session"
 
 class ApplicationController < ActionController::Base
 
+  # Security: CSRF protection enabled for all non-GET requests
+  # This protects state-changing operations from cross-site request forgery attacks
+  # JSON API requests also require CSRF tokens when using cookie-based authentication
   protect_from_forgery with: :exception
 
   before_action :login_required

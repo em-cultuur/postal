@@ -1,0 +1,192 @@
+- page_title << "IP Addresses"
+- page_title << @ip.ipv4
+- page_title << "Reputation"
+
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "IP Reputation", ip_reputation_index_path
+      &rarr;
+    = @ip.ipv4
+
+.pageContent.pageContent--compact
+
+  .reputationStats.u-margin
+    .reputationStats__grid
+      .reputationStats__card
+        .reputationStats__cardTitle Reputation Score
+        .reputationStats__cardValue= @reputation_score || "N/A"
+        .reputationStats__cardSubtext
+          - if @reputation_score
+            - if @reputation_score >= 90
+              Excellent
+            - elsif @reputation_score >= 75
+              Good
+            - elsif @reputation_score >= 60
+              Fair
+            - elsif @reputation_score >= 40
+              Poor
+            - else
+              Critical
+          - else
+            No data
+
+      .reputationStats__card
+        .reputationStats__cardTitle Active Blacklistings
+        .reputationStats__cardValue= @blacklist_count
+        .reputationStats__cardSubtext
+          - if @blacklist_count > 0
+            needs attention
+          - else
+            all clear
+
+      .reputationStats__card
+        .reputationStats__cardTitle Warming Domains
+        .reputationStats__cardValue= @warming_count
+        .reputationStats__cardSubtext in recovery mode
+
+      .reputationStats__card
+        .reputationStats__cardTitle Paused Domains
+        .reputationStats__cardValue= @paused_count
+        .reputationStats__cardSubtext temporarily disabled
+
+  - if @latest_metrics
+    %h2.sectionTitle Current Metrics
+
+    %table.dataTable.u-margin
+      %tbody
+        %tr
+          %th{:width => "30%"} Delivery Rate
+          %td= "#{@latest_metrics.delivery_rate.round(2)}%"
+        %tr
+          %th Bounce Rate
+          %td= "#{@latest_metrics.bounce_rate.round(2)}%"
+        %tr
+          %th Spam Rate
+          %td= "#{@latest_metrics.spam_rate.round(2)}%"
+        %tr
+          %th Total Sent (24h)
+          %td= @latest_metrics.sent_count
+        %tr
+          %th Total Delivered (24h)
+          %td= @latest_metrics.delivered_count
+        %tr
+          %th Total Bounced (24h)
+          %td= @latest_metrics.bounced_count
+        %tr
+          %th Spam Reports (24h)
+          %td= @latest_metrics.spam_complaint_count
+        %tr
+          %th Last Updated
+          %td= @latest_metrics.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+  %h2.sectionTitle Active Blacklist Records
+
+  - if @blacklists.empty?
+    .noData.noData--clean
+      %p.noData__text This IP address is not currently listed on any monitored blacklists.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th Blacklist
+          %th Domain
+          %th Detected At
+          %th Listed For
+          %th Actions
+      %tbody
+        - @blacklists.each do |record|
+          %tr
+            %td= link_to record.blacklist_source, ip_blacklist_record_path(record), :class => "u-link"
+            %td= record.destination_domain || "All domains"
+            %td= record.detected_at.strftime("%Y-%m-%d %H:%M")
+            %td= time_ago_in_words(record.detected_at)
+            %td.dataTable__actions
+              = link_to "Resolve", resolve_ip_blacklist_record_path(record), :method => :post, :class => "u-link u-link--small", :data => {:confirm => "Mark as resolved?"}
+              = link_to "Ignore", ignore_ip_blacklist_record_path(record), :method => :post, :class => "u-link u-link--small", :data => {:confirm => "Mark as false positive?"}
+
+  %h2.sectionTitle Domain-Specific Status
+
+  - if @exclusions.empty?
+    .noData.noData--clean
+      %p.noData__text This IP address is operating at full capacity for all domains.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th Domain
+          %th Status
+          %th Stage
+          %th Priority
+          %th Since
+          %th Actions
+      %tbody
+        - @exclusions.each do |exclusion|
+          %tr
+            %td= exclusion.destination_domain
+            %td
+              - if exclusion.paused?
+                %span.label.label--red Paused
+              - elsif exclusion.warming?
+                %span.label.label--orange Warming (Stage #{exclusion.warmup_stage})
+              - else
+                %span.label.label--green Active
+            %td
+              - if exclusion.warmup_stage == 0
+                Paused
+              - elsif exclusion.warmup_stage == 5
+                Full
+              - else
+                = "#{exclusion.warmup_stage}/4"
+            %td= "#{exclusion.current_priority}%"
+            %td= time_ago_in_words(exclusion.created_at) + " ago"
+            %td.dataTable__actions
+              - if exclusion.paused?
+                = link_to "Unpause", unpause_ip_address_path(@ip, destination_domain: exclusion.destination_domain), :method => :post, :class => "u-link u-link--small", :data => {:confirm => "Start sending for this domain?"}
+              - elsif exclusion.warming?
+                = link_to "Advance", advance_warmup_ip_address_path(@ip, destination_domain: exclusion.destination_domain), :method => :post, :class => "u-link u-link--small", :data => {:confirm => "Advance warmup stage?"}
+
+  %h2.sectionTitle Recent Health Actions
+
+  - if @recent_actions.empty?
+    .noData.noData--clean
+      %p.noData__text No recent health actions for this IP address.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th Time
+          %th Action
+          %th Domain
+          %th Reason
+          %th User
+      %tbody
+        - @recent_actions.each do |action|
+          %tr
+            %td= action.created_at.strftime("%Y-%m-%d %H:%M")
+            %td
+              - case action.action_type
+              - when 'PAUSE'
+                %span.label.label--orange Paused
+              - when 'UNPAUSE'
+                %span.label.label--green Unpaused
+              - when 'WARMUP_STAGE_ADVANCE'
+                %span.label.label--blue Warmup Advanced
+              - when 'PRIORITY_CHANGE'
+                %span.label.label--grey Priority Changed
+              - else
+                = action.action_type
+            %td= action.destination_domain || "N/A"
+            %td= truncate(action.reason, :length => 60)
+            %td= action.user ? action.user.name : "System"
+
+  %h2.sectionTitle Manual Actions
+
+  .buttonSet.u-margin
+    = link_to "Manage Domain Exclusions", ip_domain_exclusions_path, :class => "button button--primary"
+    - if @paused_count > 0 || @warming_count > 0
+      = link_to "Reset All Warmup Stages", reset_warmup_ip_address_path(@ip, destination_domain: 'all'), :method => :post, :class => "button button--warning", :data => {:confirm => "Reset all warmup stages to 0? This will pause sending for all domains."}
+
+  .buttonSet.u-margin
+    = link_to "Back to Health Status", health_ip_reputation_index_path, :class => "button"
+    = link_to "View Dashboard", dashboard_ip_reputation_index_path, :class => "button"

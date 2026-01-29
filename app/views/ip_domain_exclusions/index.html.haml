@@ -1,0 +1,92 @@
+- page_title << "Domain Exclusions"
+
+.pageHeader
+  %h1.pageHeader__title Domain Exclusions & Warmup
+
+.pageContent.pageContent--compact
+
+  %p.pageContent__intro.u-margin
+    This page shows IP addresses that are paused or in warmup mode for specific domains.
+    These exclusions are automatically created when blacklistings are detected or can be
+    manually configured.
+
+  - if params[:stage].present? || params[:status].present? || params[:destination_domain].present?
+    %p.u-margin
+      %strong Active Filters:
+      - if params[:stage].present?
+        Stage: #{params[:stage]}
+      - if params[:status].present?
+        Status: #{params[:status].humanize}
+      - if params[:destination_domain].present?
+        Domain: #{params[:destination_domain]}
+      = link_to "Clear filters", ip_domain_exclusions_path, :class => "u-link u-link--small"
+
+  %table.dataTable.u-margin
+    %thead
+      %tr
+        %th IP Address
+        %th Domain
+        %th Status
+        %th Stage
+        %th Priority
+        %th Created
+        %th Duration
+        %th Actions
+    %tbody
+      - if @exclusions.empty?
+        %tr
+          %td.dataTable__empty{:colspan => 8}
+            - if params[:stage].present? || params[:status].present? || params[:destination_domain].present?
+              No domain exclusions match the current filters.
+            - else
+              No domain exclusions found. All IP addresses are operating at full capacity.
+      - else
+        - @exclusions.each do |exclusion|
+          %tr
+            %td= link_to exclusion.ip_address.ipv4, reputation_ip_address_path(exclusion.ip_address), :class => "u-link"
+            %td= exclusion.destination_domain
+            %td
+              - if exclusion.paused?
+                %span.label.label--red Paused
+              - elsif exclusion.warming?
+                %span.label.label--orange Warming
+              - else
+                %span.label.label--grey Unknown
+            %td
+              - if exclusion.warmup_stage == 0
+                %span.label.label--red Stage 0 (Paused)
+              - elsif exclusion.warmup_stage == 5
+                %span.label.label--green Stage 5 (Full)
+              - else
+                %span.label.label--blue= "Stage #{exclusion.warmup_stage}"
+            %td= "#{exclusion.current_priority}%"
+            %td
+              = exclusion.created_at.strftime("%Y-%m-%d")
+              %br
+              %small= time_ago_in_words(exclusion.created_at) + " ago"
+            %td
+              - if exclusion.next_warmup_at && exclusion.next_warmup_at > Time.current
+                = "in #{time_ago_in_words(exclusion.next_warmup_at)}"
+              - elsif exclusion.paused?
+                Paused
+              - elsif exclusion.fully_recovered?
+                Completed
+              - else
+                N/A
+            %td.dataTable__actions
+              = link_to "View", ip_domain_exclusion_path(exclusion), :class => "u-link u-link--small"
+              - if exclusion.paused?
+                = link_to "Unpause", unpause_ip_address_path(exclusion.ip_address, destination_domain: exclusion.destination_domain), :method => :post, :class => "u-link u-link--small"
+              - elsif exclusion.warming? && exclusion.warmup_stage < 5
+                = link_to "Advance", advance_warmup_ip_address_path(exclusion.ip_address, destination_domain: exclusion.destination_domain), :method => :post, :class => "u-link u-link--small"
+
+  - if @total_pages > 1
+    .pagination.u-margin
+      - if @page > 1
+        = link_to "Previous", ip_domain_exclusions_path(page: @page - 1, stage: params[:stage], status: params[:status], destination_domain: params[:destination_domain]), :class => "pagination__link"
+      %span.pagination__info Page #{@page} of #{@total_pages}
+      - if @page < @total_pages
+        = link_to "Next", ip_domain_exclusions_path(page: @page + 1, stage: params[:stage], status: params[:status], destination_domain: params[:destination_domain]), :class => "pagination__link"
+
+  .buttonSet.u-margin
+    = link_to "Back to Dashboard", dashboard_ip_reputation_index_path, :class => "button"

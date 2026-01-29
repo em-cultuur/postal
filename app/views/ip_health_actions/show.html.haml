@@ -1,0 +1,123 @@
+- page_title << "Health Actions"
+- page_title << @action.action_type
+
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "Health Actions", ip_health_actions_path
+      &rarr;
+    Health Action Details
+
+.pageContent.pageContent--compact
+
+  %h2.sectionTitle Action Details
+
+  %table.dataTable.u-margin
+    %tbody
+      %tr
+        %th{:width => "30%"} Action Type
+        %td
+          - case @action.action_type
+          - when 'PAUSE'
+            %span.label.label--orange Pause
+          - when 'UNPAUSE'
+            %span.label.label--green Unpause
+          - when 'WARMUP_STAGE_ADVANCE'
+            %span.label.label--blue Warmup Stage Advance
+          - when 'PRIORITY_CHANGE'
+            %span.label.label--grey Priority Change
+          - when 'ROTATE'
+            %span.label.label--purple Rotate
+          - when 'MONITOR'
+            %span.label.label--grey Monitor
+          - when 'MANUAL_OVERRIDE'
+            %span.label.label--red Manual Override
+          - else
+            = @action.action_type
+      %tr
+        %th IP Address
+        %td= link_to @action.ip_address.ipv4, reputation_ip_address_path(@action.ip_address), :class => "u-link"
+      %tr
+        %th IP Pool
+        %td= @action.ip_address.ip_pool&.name || "N/A"
+      %tr
+        %th Destination Domain
+        %td= @action.destination_domain || "All domains"
+      %tr
+        %th Reason
+        %td= @action.reason
+      %tr
+        %th Triggered By
+        %td
+          - if @action.user
+            %span.label.label--blue Manual
+            \- #{@action.user.name} (#{@action.user.email_address})
+          - else
+            %span.label.label--grey Automatic
+            \- System
+      %tr
+        %th Timestamp
+        %td
+          = @action.created_at.strftime("%Y-%m-%d %H:%M:%S")
+          %br
+          %small= "(#{time_ago_in_words(@action.created_at)} ago)"
+
+  - if @action.triggered_by_blacklist
+    %h2.sectionTitle Triggered By Blacklist
+
+    %table.dataTable.u-margin
+      %tbody
+        %tr
+          %th{:width => "30%"} Blacklist Name
+          %td= link_to @action.triggered_by_blacklist.blacklist_source, ip_blacklist_record_path(@action.triggered_by_blacklist), :class => "u-link"
+        %tr
+          %th Domain
+          %td= @action.triggered_by_blacklist.destination_domain || "All domains"
+        %tr
+          %th Detected At
+          %td= @action.triggered_by_blacklist.detected_at.strftime("%Y-%m-%d %H:%M:%S")
+        %tr
+          %th Status
+          %td
+            - if @action.triggered_by_blacklist.resolved?
+              %span.label.label--green Resolved
+            - elsif @action.triggered_by_blacklist.ignored?
+              %span.label.label--grey Ignored
+            - else
+              %span.label.label--red Active
+
+  %h2.sectionTitle Related Actions
+
+  - related_actions = @action.ip_address.ip_health_actions.where.not(id: @action.id).order(created_at: :desc).limit(5)
+  - if related_actions.empty?
+    %p.u-margin No other actions recorded for this IP address.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th Time
+          %th Action
+          %th Domain
+          %th User
+      %tbody
+        - related_actions.each do |rel_action|
+          %tr
+            %td= rel_action.created_at.strftime("%Y-%m-%d %H:%M")
+            %td
+              - case rel_action.action_type
+              - when 'PAUSE'
+                %span.label.label--orange Pause
+              - when 'UNPAUSE'
+                %span.label.label--green Unpause
+              - when 'WARMUP_STAGE_ADVANCE'
+                %span.label.label--blue Warmup Advance
+              - else
+                = rel_action.action_type
+            %td= rel_action.destination_domain || "All"
+            %td= rel_action.user ? rel_action.user.name : "System"
+
+  .buttonSet.u-margin
+    = link_to "Back to Audit Log", ip_health_actions_path, :class => "button"
+    = link_to "View IP Reputation", reputation_ip_address_path(@action.ip_address), :class => "button"
+    - if @action.triggered_by_blacklist
+      = link_to "View Blacklist Record", ip_blacklist_record_path(@action.triggered_by_blacklist), :class => "button"

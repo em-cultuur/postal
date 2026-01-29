@@ -168,6 +168,159 @@ RSpec.describe QueuedMessage do
           expect { queued_message.allocate_ip_address }.to change(queued_message, :ip_address).from(nil).to(ip_pool.ip_addresses.first)
         end
       end
+
+      context "when IP pool has multiple IPs with blacklist considerations" do
+        let(:ip_pool) { create(:ip_pool) }
+        let(:server) { create(:server, ip_pool: ip_pool) }
+        let(:destination_domain) { "gmail.com" }
+        let(:message) do
+          MessageFactory.outgoing(server) do |msg|
+            msg.rcpt_to = "user@#{destination_domain}"
+          end
+        end
+
+        let!(:healthy_ip) { create(:ip_address, ip_pool: ip_pool, priority: 100) }
+        let!(:blacklisted_ip) { create(:ip_address, ip_pool: ip_pool, priority: 100) }
+        let!(:warming_ip) { create(:ip_address, ip_pool: ip_pool, priority: 100) }
+
+        subject(:queued_message) { build(:queued_message, message: message, domain: destination_domain, server: server) }
+
+        before do
+          # Blacklist one IP for gmail.com
+          blacklist_record = create(:ip_blacklist_record,
+                                    ip_address: blacklisted_ip,
+                                    destination_domain: destination_domain,
+                                    status: "active")
+
+          # Create exclusion for blacklisted IP (paused)
+          create(:ip_domain_exclusion,
+                 ip_address: blacklisted_ip,
+                 destination_domain: destination_domain,
+                 warmup_stage: 0,
+                 reason: "Blacklisted")
+
+          # Put another IP in warmup stage 1 (priority 20)
+          create(:ip_domain_exclusion,
+                 ip_address: warming_ip,
+                 destination_domain: destination_domain,
+                 warmup_stage: 1,
+                 reason: "Warming up",
+                 next_warmup_at: 1.day.from_now)
+        end
+
+        it "does not allocate blacklisted IPs" do
+          # Test multiple times to ensure blacklisted IP is never selected
+          100.times do
+            qm = build(:queued_message, message: message, domain: destination_domain, server: server)
+            qm.allocate_ip_address
+            expect(qm.ip_address).not_to eq(blacklisted_ip) if qm.ip_address
+          end
+        end
+
+        it "prefers healthy IPs over warming IPs" do
+          # Due to weighted selection, healthy IP (priority 100) should be selected
+          # much more often than warming IP (priority 20)
+          selections = 100.times.map do
+            qm = build(:queued_message, message: message, domain: destination_domain, server: server)
+            qm.allocate_ip_address
+            qm.ip_address
+          end.compact
+
+          healthy_count = selections.count(healthy_ip)
+          warming_count = selections.count(warming_ip)
+
+          # Healthy IP should be selected significantly more often
+          # With priorities 100 vs 20, we expect roughly 5:1 ratio
+          expect(healthy_count).to be > warming_count * 2
+        end
+
+        it "can still select warming IPs occasionally" do
+          # Warming IPs should still be selected sometimes (not paused)
+          selections = 50.times.map do
+            qm = build(:queued_message, message: message, domain: destination_domain, server: server)
+            qm.allocate_ip_address
+            qm.ip_address
+          end.compact
+
+          expect(selections).to include(warming_ip)
+        end
+      end
+
+      context "when all IPs in pool are blacklisted for destination domain" do
+        let(:ip_pool) { create(:ip_pool) }
+        let(:server) { create(:server, ip_pool: ip_pool) }
+        let(:destination_domain) { "gmail.com" }
+        let(:message) do
+          MessageFactory.outgoing(server) do |msg|
+            msg.rcpt_to = "user@#{destination_domain}"
+          end
+        end
+
+        let!(:ip1) { create(:ip_address, ip_pool: ip_pool) }
+        let!(:ip2) { create(:ip_address, ip_pool: ip_pool) }
+
+        subject(:queued_message) { build(:queued_message, message: message, domain: destination_domain, server: server) }
+
+        before do
+          # Blacklist both IPs for this domain
+          [ip1, ip2].each do |ip|
+            create(:ip_blacklist_record,
+                   ip_address: ip,
+                   destination_domain: destination_domain,
+                   status: "active")
+            create(:ip_domain_exclusion,
+                   ip_address: ip,
+                   destination_domain: destination_domain,
+                   warmup_stage: 0)
+          end
+        end
+
+        it "returns nil when no healthy IPs are available" do
+          queued_message.allocate_ip_address
+          expect(queued_message.ip_address).to be_nil
+        end
+      end
+
+      context "when IP is blacklisted for one domain but not another" do
+        let(:ip_pool) { create(:ip_pool) }
+        let(:server) { create(:server, ip_pool: ip_pool) }
+        let(:message_gmail) do
+          MessageFactory.outgoing(server) do |msg|
+            msg.rcpt_to = "user@gmail.com"
+          end
+        end
+        let(:message_yahoo) do
+          MessageFactory.outgoing(server) do |msg|
+            msg.rcpt_to = "user@yahoo.com"
+          end
+        end
+
+        let!(:ip_address) { create(:ip_address, ip_pool: ip_pool, priority: 100) }
+
+        before do
+          # Blacklist IP for gmail.com only
+          create(:ip_blacklist_record,
+                 ip_address: ip_address,
+                 destination_domain: "gmail.com",
+                 status: "active")
+          create(:ip_domain_exclusion,
+                 ip_address: ip_address,
+                 destination_domain: "gmail.com",
+                 warmup_stage: 0)
+        end
+
+        it "does not allocate IP for blacklisted domain" do
+          qm_gmail = build(:queued_message, message: message_gmail, domain: "gmail.com", server: server)
+          qm_gmail.allocate_ip_address
+          expect(qm_gmail.ip_address).to be_nil
+        end
+
+        it "allocates IP for non-blacklisted domain" do
+          qm_yahoo = build(:queued_message, message: message_yahoo, domain: "yahoo.com", server: server)
+          qm_yahoo.allocate_ip_address
+          expect(qm_yahoo.ip_address).to eq(ip_address)
+        end
+      end
     end
   end
 

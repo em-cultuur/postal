@@ -1,0 +1,114 @@
+- page_title << "Blacklist Records"
+- page_title << @record.blacklist_source
+
+.pageHeader
+  %h1.pageHeader__title
+    %span.pageHeader__titlePrevious
+      = link_to "Blacklist Records", ip_blacklist_records_path
+      &rarr;
+    = @record.blacklist_source
+
+.pageContent.pageContent--compact
+
+  %h2.sectionTitle Blacklist Details
+
+  %table.dataTable.u-margin
+    %tbody
+      %tr
+        %th{:width => "30%"} IP Address
+        %td= link_to @record.ip_address.ipv4, reputation_ip_address_path(@record.ip_address), :class => "u-link"
+      %tr
+        %th Blacklist Name
+        %td= @record.blacklist_source
+      %tr
+        %th Destination Domain
+        %td= @record.destination_domain || "All domains (general blacklisting)"
+      %tr
+        %th Detected At
+        %td
+          = @record.detected_at.strftime("%Y-%m-%d %H:%M:%S")
+          %br
+          %small= "(#{time_ago_in_words(@record.detected_at)} ago)"
+      %tr
+        %th Status
+        %td
+          - if @record.resolved?
+            %span.label.label--green Resolved
+          - elsif @record.ignored?
+            %span.label.label--grey Ignored
+          - else
+            %span.label.label--red Active
+      - if @record.resolved?
+        %tr
+          %th Resolved At
+          %td
+            = @record.resolved_at.strftime("%Y-%m-%d %H:%M:%S")
+            %br
+            %small= "(#{time_ago_in_words(@record.resolved_at)} ago)"
+      %tr
+        %th Last Checked
+        %td
+          - if @record.last_checked_at
+            = @record.last_checked_at.strftime("%Y-%m-%d %H:%M:%S")
+            %br
+            %small= "(#{time_ago_in_words(@record.last_checked_at)} ago)"
+          - else
+            Never rechecked
+      %tr
+        %th Created At
+        %td= @record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+      %tr
+        %th Updated At
+        %td= @record.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+
+  - triggered_actions = @record.ip_health_actions.order(created_at: :desc).limit(5)
+  - if triggered_actions.any?
+    %h2.sectionTitle Triggered Actions
+
+    - triggered_actions.each do |action|
+      %table.dataTable.u-margin
+        %tbody
+          %tr
+            %th{:width => "30%"} Action Type
+            %td= action.action_type.titleize
+          %tr
+            %th Reason
+            %td= action.reason
+          %tr
+            %th Taken At
+            %td= action.created_at.strftime("%Y-%m-%d %H:%M:%S")
+          - if action.user
+            %tr
+              %th Performed By
+              %td= action.user.name
+          %tr
+            %th
+            %td= link_to "View Action Details", ip_health_action_path(action), :class => "button button--small"
+
+  %h2.sectionTitle Actions
+
+  - if @record.resolved? || @record.ignored?
+    %p.u-margin
+      This blacklist record has been marked as
+      - if @record.resolved?
+        %strong resolved
+        and is no longer considered active.
+      - else
+        %strong ignored
+        and will not trigger automatic health actions.
+
+    .buttonSet.u-margin
+      = link_to "Recheck Delisting", recheck_ip_blacklist_record_path(@record), :method => :post, :class => "button button--primary", :data => {:confirm => "Verify if this IP is still listed?"}
+  - else
+    %p.u-margin
+      This blacklist record is currently active. You can mark it as resolved if you've
+      successfully delisted the IP, or ignore it if it's a false positive.
+
+    .buttonSet.u-margin
+      = link_to "Mark as Resolved", resolve_ip_blacklist_record_path(@record), :method => :post, :class => "button button--positive", :data => {:confirm => "Mark this record as resolved? This will start warmup recovery."}
+      = link_to "Mark as Ignored", ignore_ip_blacklist_record_path(@record), :method => :post, :class => "button button--grey", :data => {:confirm => "Mark as false positive? This will prevent automatic actions."}
+      = link_to "Recheck Delisting", recheck_ip_blacklist_record_path(@record), :method => :post, :class => "button", :data => {:confirm => "Verify current blacklist status?"}
+
+  .buttonSet.u-margin
+    = link_to "Back to Records", ip_blacklist_records_path, :class => "button"
+    = link_to "View IP Reputation", reputation_ip_address_path(@record.ip_address), :class => "button"

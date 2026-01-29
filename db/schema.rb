@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # This file is auto-generated from the current state of the database. Instead
 # of editing this file, please use the migrations feature of Active Record to
 # incrementally modify your database, and then regenerate this schema definition.
@@ -10,7 +12,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
+ActiveRecord::Schema[7.1].define(version: 2026_01_28_120001) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -81,7 +83,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.string "reason"
     t.datetime "created_at", precision: nil
     t.datetime "updated_at", precision: nil
-    t.index ["server_id", "domain"], name: "index_domain_throttles_on_server_id_and_domain", unique: true
+    t.index %w[server_id domain], name: "index_domain_throttles_on_server_id_and_domain", unique: true
     t.index ["throttled_until"], name: "index_domain_throttles_on_throttled_until"
   end
 
@@ -112,7 +114,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.boolean "use_for_any"
     t.boolean "mta_sts_enabled", default: false
     t.string "mta_sts_mode", limit: 20, default: "testing"
-    t.integer "mta_sts_max_age", default: 86400
+    t.integer "mta_sts_max_age", default: 86_400
     t.text "mta_sts_mx_patterns"
     t.string "mta_sts_status"
     t.string "mta_sts_error"
@@ -153,6 +155,67 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.integer "priority"
   end
 
+  create_table "ip_blacklist_records", id: :integer, charset: "utf8mb4", collation: "utf8mb4_uca1400_ai_ci", force: :cascade do |t|
+    t.integer "ip_address_id", null: false
+    t.string "destination_domain", null: false
+    t.string "blacklist_source", null: false
+    t.string "status", default: "active", null: false
+    t.text "details"
+    t.datetime "detected_at", precision: nil, null: false
+    t.datetime "resolved_at", precision: nil
+    t.datetime "last_checked_at", precision: nil
+    t.integer "check_count", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "detection_method", default: "dnsbl_check"
+    t.string "smtp_response_code"
+    t.text "smtp_response_message"
+    t.integer "smtp_rejection_event_id"
+    t.index ["destination_domain"], name: "index_ip_blacklist_records_on_destination_domain"
+    t.index ["detection_method"], name: "index_ip_blacklist_records_on_detection_method"
+    t.index %w[ip_address_id destination_domain blacklist_source], name: "index_blacklist_on_ip_domain_source", unique: true
+    t.index ["ip_address_id"], name: "index_ip_blacklist_records_on_ip_address_id"
+    t.index ["smtp_rejection_event_id"], name: "index_ip_blacklist_records_on_smtp_rejection_event_id"
+    t.index %w[status last_checked_at], name: "index_ip_blacklist_records_on_status_and_last_checked_at"
+  end
+
+  create_table "ip_domain_exclusions", id: :integer, charset: "utf8mb4", collation: "utf8mb4_uca1400_ai_ci", force: :cascade do |t|
+    t.integer "ip_address_id", null: false
+    t.string "destination_domain", null: false
+    t.datetime "excluded_at", precision: nil, null: false
+    t.datetime "excluded_until", precision: nil
+    t.string "reason"
+    t.integer "warmup_stage", default: 0
+    t.datetime "next_warmup_at", precision: nil
+    t.integer "ip_blacklist_record_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["excluded_until"], name: "index_ip_domain_exclusions_on_excluded_until"
+    t.index %w[ip_address_id destination_domain], name: "index_exclusions_on_ip_domain", unique: true
+    t.index ["ip_address_id"], name: "index_ip_domain_exclusions_on_ip_address_id"
+    t.index ["ip_blacklist_record_id"], name: "fk_rails_9800e8bc75"
+    t.index ["next_warmup_at"], name: "index_ip_domain_exclusions_on_next_warmup_at"
+  end
+
+  create_table "ip_health_actions", id: :integer, charset: "utf8mb4", collation: "utf8mb4_uca1400_ai_ci", force: :cascade do |t|
+    t.integer "ip_address_id", null: false
+    t.string "action_type", null: false
+    t.string "destination_domain"
+    t.text "reason"
+    t.integer "previous_priority"
+    t.integer "new_priority"
+    t.boolean "paused", default: false
+    t.integer "triggered_by_blacklist_id"
+    t.integer "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index %w[action_type created_at], name: "index_ip_health_actions_on_action_type_and_created_at"
+    t.index %w[ip_address_id created_at], name: "index_ip_health_actions_on_ip_address_id_and_created_at"
+    t.index ["ip_address_id"], name: "index_ip_health_actions_on_ip_address_id"
+    t.index ["triggered_by_blacklist_id"], name: "fk_rails_ae85b5e5c9"
+    t.index ["user_id"], name: "fk_rails_b7e206eaea"
+  end
+
   create_table "ip_pool_rules", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.string "uuid"
     t.string "owner_type"
@@ -171,6 +234,38 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.datetime "updated_at"
     t.boolean "default", default: false
     t.index ["uuid"], name: "index_ip_pools_on_uuid", length: 8
+  end
+
+  create_table "ip_reputation_metrics", id: :integer, charset: "utf8mb4", collation: "utf8mb4_uca1400_ai_ci", force: :cascade do |t|
+    t.integer "ip_address_id", null: false
+    t.string "destination_domain"
+    t.string "sender_domain"
+    t.string "period", default: "daily", null: false
+    t.date "period_date", null: false
+    t.integer "sent_count", default: 0
+    t.integer "delivered_count", default: 0
+    t.integer "bounced_count", default: 0
+    t.integer "soft_fail_count", default: 0
+    t.integer "hard_fail_count", default: 0
+    t.integer "spam_complaint_count", default: 0
+    t.integer "bounce_rate", default: 0
+    t.integer "delivery_rate", default: 0
+    t.integer "spam_rate", default: 0
+    t.integer "reputation_score", default: 100
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "metric_type"
+    t.decimal "metric_value", precision: 10, scale: 4
+    t.decimal "complaint_rate", precision: 10, scale: 6
+    t.decimal "auth_success_rate", precision: 10, scale: 4
+    t.integer "trap_hits", default: 0
+    t.text "metadata"
+    t.index %w[ip_address_id destination_domain period period_date], name: "index_reputation_on_ip_dest_period", unique: true
+    t.index %w[ip_address_id metric_type period_date], name: "index_ip_reputation_on_ip_type_date"
+    t.index ["ip_address_id"], name: "index_ip_reputation_metrics_on_ip_address_id"
+    t.index ["metric_type"], name: "index_ip_reputation_metrics_on_metric_type"
+    t.index ["period_date"], name: "index_ip_reputation_metrics_on_period_date"
+    t.index ["reputation_score"], name: "index_ip_reputation_metrics_on_reputation_score"
   end
 
   create_table "mx_domain_cache", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
@@ -201,7 +296,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.index ["created_at"], name: "index_mx_rate_limit_events_on_created_at"
     t.index ["event_type"], name: "index_mx_rate_limit_events_on_event_type"
     t.index ["queued_message_id"], name: "index_mx_rate_limit_events_on_queued_message_id"
-    t.index ["server_id", "mx_domain"], name: "index_mx_rate_limit_events_on_server_and_mx"
+    t.index %w[server_id mx_domain], name: "index_mx_rate_limit_events_on_server_and_mx"
   end
 
   create_table "mx_rate_limit_patterns", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
@@ -226,7 +321,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.index ["created_by_id"], name: "fk_rails_680cf527f5"
-    t.index ["server_id", "mx_domain"], name: "index_whitelist_on_server_and_mx", unique: true
+    t.index %w[server_id mx_domain], name: "index_whitelist_on_server_and_mx", unique: true
     t.index ["server_id"], name: "index_whitelist_on_server"
   end
 
@@ -245,8 +340,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.boolean "whitelisted", default: false, comment: "Skip rate limiting for this MX domain"
     t.index ["current_delay"], name: "index_mx_rate_limits_on_current_delay"
     t.index ["last_error_at"], name: "index_mx_rate_limits_on_last_error_at"
-    t.index ["server_id", "mx_domain"], name: "index_mx_rate_limits_on_server_and_mx", unique: true
-    t.index ["server_id", "whitelisted"], name: "index_mx_rate_limits_whitelisted"
+    t.index %w[server_id mx_domain], name: "index_mx_rate_limits_on_server_and_mx", unique: true
+    t.index %w[server_id whitelisted], name: "index_mx_rate_limits_whitelisted"
   end
 
   create_table "organization_ip_pools", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
@@ -374,6 +469,22 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.datetime "updated_at"
   end
 
+  create_table "smtp_rejection_events", id: :integer, charset: "utf8mb4", collation: "utf8mb4_uca1400_ai_ci", force: :cascade do |t|
+    t.integer "ip_address_id", null: false
+    t.string "destination_domain", null: false
+    t.string "smtp_code", null: false
+    t.string "bounce_type", null: false
+    t.text "smtp_message"
+    t.text "parsed_details"
+    t.datetime "occurred_at", precision: nil, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index %w[bounce_type occurred_at], name: "index_smtp_rejection_events_on_bounce_type_and_occurred_at"
+    t.index ["destination_domain"], name: "index_smtp_rejection_events_on_destination_domain"
+    t.index %w[ip_address_id destination_domain occurred_at], name: "index_smtp_events_on_ip_domain_time"
+    t.index ["ip_address_id"], name: "index_smtp_rejection_events_on_ip_address_id"
+  end
+
   create_table "statistics", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.bigint "total_messages", default: 0
     t.bigint "total_outgoing", default: 0
@@ -484,8 +595,17 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_26_000007) do
     t.index ["role"], name: "index_worker_roles_on_role", unique: true
   end
 
+  add_foreign_key "ip_blacklist_records", "ip_addresses"
+  add_foreign_key "ip_blacklist_records", "smtp_rejection_events"
+  add_foreign_key "ip_domain_exclusions", "ip_addresses"
+  add_foreign_key "ip_domain_exclusions", "ip_blacklist_records"
+  add_foreign_key "ip_health_actions", "ip_addresses"
+  add_foreign_key "ip_health_actions", "ip_blacklist_records", column: "triggered_by_blacklist_id"
+  add_foreign_key "ip_health_actions", "users"
+  add_foreign_key "ip_reputation_metrics", "ip_addresses"
   add_foreign_key "mx_rate_limit_events", "servers"
   add_foreign_key "mx_rate_limit_whitelists", "servers"
   add_foreign_key "mx_rate_limit_whitelists", "users", column: "created_by_id"
   add_foreign_key "mx_rate_limits", "servers"
+  add_foreign_key "smtp_rejection_events", "ip_addresses"
 end

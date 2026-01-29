@@ -1,0 +1,103 @@
+- page_title << "IP Reputation Dashboard"
+
+.pageHeader
+  %h1.pageHeader__title IP Reputation Dashboard
+
+.pageContent.pageContent--compact
+
+  .reputationStats.u-margin
+    .reputationStats__grid
+      .reputationStats__card
+        .reputationStats__cardTitle Total IPs
+        .reputationStats__cardValue= @stats[:total_ips]
+        .reputationStats__cardSubtext in all pools
+
+      .reputationStats__card.reputationStats__card--success
+        .reputationStats__cardTitle Healthy IPs
+        .reputationStats__cardValue= @stats[:healthy_ips]
+        .reputationStats__cardSubtext no issues detected
+
+      .reputationStats__card.reputationStats__card--warning
+        .reputationStats__cardTitle Warming IPs
+        .reputationStats__cardValue= @stats[:warming_ips]
+        .reputationStats__cardSubtext in recovery
+
+      .reputationStats__card.reputationStats__card--danger
+        .reputationStats__cardTitle Blacklisted IPs
+        .reputationStats__cardValue= @stats[:blacklisted_ips]
+        .reputationStats__cardSubtext active blacklistings
+
+  %h2.sectionTitle Recent Blacklist Events
+
+  - if @recent_blacklists.empty?
+    .noData.noData--clean
+      %p.noData__title No recent blacklist events
+      %p.noData__text All IP addresses are in good standing. Recent blacklist checks have not detected any issues.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th IP Address
+          %th Blacklist
+          %th Domain
+          %th Detected
+          %th Status
+          %th Actions
+      %tbody
+        - for record in @recent_blacklists
+          %tr
+            %td= link_to record.ip_address.ipv4, ip_blacklist_record_path(record), :class => "u-link"
+            %td= record.blacklist_source
+            %td= record.destination_domain || "All domains"
+            %td= record.detected_at.strftime("%Y-%m-%d %H:%M")
+            %td
+              - if record.resolved?
+                %span.label.label--green Resolved
+              - elsif record.ignored?
+                %span.label.label--grey Ignored
+              - else
+                %span.label.label--red Active
+            %td
+              - unless record.resolved? || record.ignored?
+                = link_to "Resolve", resolve_ip_blacklist_record_path(record), :method => :post, :class => "u-link u-link--small", :data => {:confirm => "Mark this blacklist record as resolved?"}
+
+  %h2.sectionTitle Recent Health Actions
+
+  - if @recent_actions.empty?
+    .noData.noData--clean
+      %p.noData__text No recent health actions recorded.
+  - else
+    %table.dataTable.u-margin
+      %thead
+        %tr
+          %th Time
+          %th IP Address
+          %th Action
+          %th Domain
+          %th Reason
+          %th User
+      %tbody
+        - for action in @recent_actions
+          %tr
+            %td= action.created_at.strftime("%Y-%m-%d %H:%M")
+            %td= link_to action.ip_address.ipv4, reputation_ip_address_path(action.ip_address), :class => "u-link"
+            %td
+              - case action.action_type
+              - when 'PAUSE'
+                %span.label.label--orange Paused
+              - when 'UNPAUSE'
+                %span.label.label--green Unpaused
+              - when 'WARMUP_STAGE_ADVANCE'
+                %span.label.label--blue Warmup Advanced
+              - when 'PRIORITY_CHANGE'
+                %span.label.label--grey Priority Changed
+              - else
+                = action.action_type
+            %td= action.destination_domain || "N/A"
+            %td= truncate(action.reason, :length => 50)
+            %td= action.user ? action.user.name : "System"
+
+  .buttonSet.u-margin
+    = link_to "View All IP Health Status", health_ip_reputation_index_path, :class => "button button--primary"
+    = link_to "View Blacklist Records", ip_blacklist_records_path, :class => "button"
+    = link_to "View Health Actions", ip_health_actions_path, :class => "button"

@@ -1,0 +1,73 @@
+- page_title << "Blacklist Records"
+
+.pageHeader
+  %h1.pageHeader__title Blacklist Records
+
+.pageContent.pageContent--compact
+
+  %p.pageContent__intro.u-margin
+    This page shows all detected blacklist events across your IP addresses. Use filters
+    to narrow down results by status, IP address, or blacklist name.
+
+  - if params[:status].present? || params[:ip_address_id].present? || params[:blacklist].present?
+    %p.u-margin
+      %strong Active Filters:
+      - if params[:status].present?
+        Status: #{params[:status].humanize}
+      - if params[:ip_address_id].present?
+        IP: #{@ip_addresses.find { |ip| ip.id.to_s == params[:ip_address_id] }&.ipv4}
+      - if params[:blacklist].present?
+        Blacklist: #{params[:blacklist]}
+      = link_to "Clear filters", ip_blacklist_records_path, :class => "u-link u-link--small"
+
+  %table.dataTable.u-margin
+    %thead
+      %tr
+        %th IP Address
+        %th Blacklist
+        %th Domain
+        %th Detected At
+        %th Listed For
+        %th Status
+        %th Actions
+    %tbody
+      - if @records.empty?
+        %tr
+          %td.dataTable__empty{:colspan => 7}
+            - if params[:status].present? || params[:ip_address_id].present? || params[:blacklist].present?
+              No blacklist records match the current filters.
+            - else
+              No blacklist records found. All IP addresses are in good standing.
+      - else
+        - @records.each do |record|
+          %tr
+            %td= link_to record.ip_address.ipv4, reputation_ip_address_path(record.ip_address), :class => "u-link"
+            %td= link_to record.blacklist_source, ip_blacklist_record_path(record), :class => "u-link"
+            %td= record.destination_domain || "All domains"
+            %td= record.detected_at.strftime("%Y-%m-%d %H:%M")
+            %td= time_ago_in_words(record.detected_at)
+            %td
+              - if record.resolved?
+                %span.label.label--green Resolved
+                - if record.resolved_at
+                  %br
+                  %small= record.resolved_at.strftime("%Y-%m-%d")
+              - elsif record.ignored?
+                %span.label.label--grey Ignored
+              - else
+                %span.label.label--red Active
+            %td.dataTable__actions
+              = link_to "View", ip_blacklist_record_path(record), :class => "u-link u-link--small"
+              - unless record.resolved? || record.ignored?
+                = link_to "Resolve", resolve_ip_blacklist_record_path(record), :method => :post, :class => "u-link u-link--small", :data => {:confirm => "Mark as resolved?"}
+
+  - if @total_pages > 1
+    .pagination.u-margin
+      - if @page > 1
+        = link_to "Previous", ip_blacklist_records_path(page: @page - 1, status: params[:status], ip_address_id: params[:ip_address_id], blacklist: params[:blacklist]), :class => "pagination__link"
+      %span.pagination__info Page #{@page} of #{@total_pages}
+      - if @page < @total_pages
+        = link_to "Next", ip_blacklist_records_path(page: @page + 1, status: params[:status], ip_address_id: params[:ip_address_id], blacklist: params[:blacklist]), :class => "pagination__link"
+
+  .buttonSet.u-margin
+    = link_to "Back to Dashboard", dashboard_ip_reputation_index_path, :class => "button"
