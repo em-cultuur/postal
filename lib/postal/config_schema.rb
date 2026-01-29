@@ -743,6 +743,63 @@ module Postal
         description "The JWKS endpoint on the authorization server (only used when discovery is false)"
       end
     end
+
+    group :ip_reputation do
+      string :google_postmaster_access_token do
+        description "OAuth2 access token for Google Postmaster Tools API"
+      end
+
+      string :google_postmaster_refresh_token do
+        description "OAuth2 refresh token for Google Postmaster Tools API"
+      end
+
+      string :google_postmaster_client_id do
+        description "OAuth2 client ID for Google Postmaster Tools API"
+      end
+
+      string :google_postmaster_client_secret do
+        description "OAuth2 client secret for Google Postmaster Tools API"
+      end
+
+      string :google_postmaster_domains do
+        array
+        description "List of domains to monitor in Google Postmaster Tools"
+      end
+
+      string :microsoft_snds_api_key do
+        description "API key for Microsoft SNDS (Smart Network Data Services)"
+      end
+
+      float :google_spam_rate_high do
+        description "Google Postmaster spam rate threshold (decimal) for pausing IP (e.g., 0.10 for 10%)"
+        default 0.10
+      end
+
+      float :google_spam_rate_medium do
+        description "Google Postmaster spam rate threshold (decimal) for warnings (e.g., 0.05 for 5%)"
+        default 0.05
+      end
+
+      float :google_user_spam_rate_high do
+        description "Google Postmaster user-reported spam rate threshold (decimal) for pausing IP (e.g., 0.03 for 3%)"
+        default 0.03
+      end
+
+      float :google_user_spam_rate_medium do
+        description "Google Postmaster user-reported spam rate threshold (decimal) for warnings (e.g., 0.01 for 1%)"
+        default 0.01
+      end
+
+      float :snds_complaint_rate_high do
+        description "Microsoft SNDS complaint rate threshold (decimal) for pausing IP (e.g., 0.003 for 0.3%)"
+        default 0.003
+      end
+
+      float :snds_complaint_rate_medium do
+        description "Microsoft SNDS complaint rate threshold (decimal) for warnings (e.g., 0.001 for 0.1%)"
+        default 0.001
+      end
+    end
   end
 
   class << self

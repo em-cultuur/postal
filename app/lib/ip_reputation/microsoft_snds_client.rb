@@ -82,7 +82,7 @@ module IPReputation
     private
 
     def default_api_key
-      Postal::Config.ip_reputation&.microsoft_snds&.[](:api_key)
+      Postal::Config.ip_reputation&.microsoft_snds_api_key
     end
 
     def fetch_snds_data(date:)

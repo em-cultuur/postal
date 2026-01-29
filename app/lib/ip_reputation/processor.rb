@@ -9,40 +9,13 @@ module IPReputation
   # - Triggers automatic IP pausing based on reputation thresholds
   # - Integrates with IPBlacklist::IPHealthManager for consistent action handling
   #
+  # Thresholds are configured in ip_reputation section of postal.yml
+  #
   # Usage:
   #   processor = IPReputation::Processor.new
   #   processor.process_all_ips
   #
   class Processor
-
-    # Reputation thresholds for automatic actions
-    THRESHOLDS = {
-      google_postmaster: {
-        domain_reputation: {
-          bad: :pause,      # Pause immediately on BAD reputation
-          low: :warn        # Log warning on LOW reputation
-        },
-        spam_rate: {
-          high: 0.10,       # Pause if spam rate > 10%
-          medium: 0.05      # Warn if spam rate > 5%
-        },
-        user_spam_rate: {
-          high: 0.03,       # Pause if user-reported spam > 3%
-          medium: 0.01      # Warn if user-reported spam > 1%
-        }
-      },
-      microsoft_snds: {
-        filter_result: {
-          red: :pause,      # Pause on RED status
-          yellow: :warn,    # Warn on YELLOW status
-          trap: :pause      # Pause immediately on trap hits
-        },
-        complaint_rate: {
-          high: 0.003,      # Pause if complaint rate > 0.3%
-          medium: 0.001     # Warn if complaint rate > 0.1%
-        }
-      }
-    }.freeze
 
     attr_reader :google_client, :snds_client
 
@@ -151,6 +124,8 @@ module IPReputation
     end
 
     def check_google_thresholds(ip_address, domain, data)
+      config = Postal::Config.ip_reputation
+
       # Check domain reputation
       if data[:domain_reputation] == "BAD"
         pause_ip_for_domain(ip_address, domain, "Google Postmaster: BAD domain reputation")
@@ -159,19 +134,20 @@ module IPReputation
       end
 
       # Check spam rate
-      if data[:spam_rate] && data[:spam_rate] > THRESHOLDS[:google_postmaster][:spam_rate][:high]
+      if data[:spam_rate] && data[:spam_rate] > config.google_spam_rate_high
         pause_ip_for_domain(ip_address, domain, "Google Postmaster: High spam rate (#{(data[:spam_rate] * 100).round(2)}%)")
-      elsif data[:spam_rate] && data[:spam_rate] > THRESHOLDS[:google_postmaster][:spam_rate][:medium]
+      elsif data[:spam_rate] && data[:spam_rate] > config.google_spam_rate_medium
         log_warning(ip_address, domain, "Google Postmaster: Elevated spam rate (#{(data[:spam_rate] * 100).round(2)}%)")
       end
 
       # Check user-reported spam rate
-      return unless data[:user_reported_spam_rate] && data[:user_reported_spam_rate] > THRESHOLDS[:google_postmaster][:user_spam_rate][:high]
+      return unless data[:user_reported_spam_rate] && data[:user_reported_spam_rate] > config.google_user_spam_rate_high
 
       pause_ip_for_domain(ip_address, domain, "Google Postmaster: High user-reported spam (#{(data[:user_reported_spam_rate] * 100).round(2)}%)")
     end
 
     def check_snds_thresholds(ip_address, data)
+      config = Postal::Config.ip_reputation
       domain = "outlook.com"
 
       # Check filter result color
@@ -185,9 +161,9 @@ module IPReputation
       end
 
       # Check complaint rate
-      if data[:complaint_rate] && data[:complaint_rate] > THRESHOLDS[:microsoft_snds][:complaint_rate][:high]
+      if data[:complaint_rate] && data[:complaint_rate] > config.snds_complaint_rate_high
         pause_ip_for_domain(ip_address, domain, "Microsoft SNDS: High complaint rate (#{(data[:complaint_rate] * 100).round(3)}%)")
-      elsif data[:complaint_rate] && data[:complaint_rate] > THRESHOLDS[:microsoft_snds][:complaint_rate][:medium]
+      elsif data[:complaint_rate] && data[:complaint_rate] > config.snds_complaint_rate_medium
         log_warning(ip_address, domain, "Microsoft SNDS: Elevated complaint rate (#{(data[:complaint_rate] * 100).round(3)}%)")
       end
     end

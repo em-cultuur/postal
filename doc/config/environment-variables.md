@@ -145,3 +145,15 @@ This document contains all the environment variables which are available for thi
 | `OIDC_TOKEN_ENDPOINT` | String | The token endpoint on the authorization server (only used when discovery is false) |  |
 | `OIDC_USERINFO_ENDPOINT` | String | The user info endpoint on the authorization server (only used when discovery is false) |  |
 | `OIDC_JWKS_URI` | String | The JWKS endpoint on the authorization server (only used when discovery is false) |  |
+| `IP_REPUTATION_GOOGLE_POSTMASTER_ACCESS_TOKEN` | String | OAuth2 access token for Google Postmaster Tools API |  |
+| `IP_REPUTATION_GOOGLE_POSTMASTER_REFRESH_TOKEN` | String | OAuth2 refresh token for Google Postmaster Tools API |  |
+| `IP_REPUTATION_GOOGLE_POSTMASTER_CLIENT_ID` | String | OAuth2 client ID for Google Postmaster Tools API |  |
+| `IP_REPUTATION_GOOGLE_POSTMASTER_CLIENT_SECRET` | String | OAuth2 client secret for Google Postmaster Tools API |  |
+| `IP_REPUTATION_GOOGLE_POSTMASTER_DOMAINS` | Array of strings | List of domains to monitor in Google Postmaster Tools | [] |
+| `IP_REPUTATION_MICROSOFT_SNDS_API_KEY` | String | API key for Microsoft SNDS (Smart Network Data Services) |  |
+| `IP_REPUTATION_GOOGLE_SPAM_RATE_HIGH` | Float | Google Postmaster spam rate threshold (decimal) for pausing IP (e.g., 0.10 for 10%) | 0.1 |
+| `IP_REPUTATION_GOOGLE_SPAM_RATE_MEDIUM` | Float | Google Postmaster spam rate threshold (decimal) for warnings (e.g., 0.05 for 5%) | 0.05 |
+| `IP_REPUTATION_GOOGLE_USER_SPAM_RATE_HIGH` | Float | Google Postmaster user-reported spam rate threshold (decimal) for pausing IP (e.g., 0.03 for 3%) | 0.03 |
+| `IP_REPUTATION_GOOGLE_USER_SPAM_RATE_MEDIUM` | Float | Google Postmaster user-reported spam rate threshold (decimal) for warnings (e.g., 0.01 for 1%) | 0.01 |
+| `IP_REPUTATION_SNDS_COMPLAINT_RATE_HIGH` | Float | Microsoft SNDS complaint rate threshold (decimal) for pausing IP (e.g., 0.003 for 0.3%) | 0.003 |
+| `IP_REPUTATION_SNDS_COMPLAINT_RATE_MEDIUM` | Float | Microsoft SNDS complaint rate threshold (decimal) for warnings (e.g., 0.001 for 0.1%) | 0.001 |
