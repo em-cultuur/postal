@@ -32,7 +32,7 @@ class MXRateLimitsController < ApplicationController
               success_count: rl.success_count,
               last_error_at: rl.last_error_at,
               last_success_at: rl.last_success_at,
-              last_error_message: rl.last_error_message,
+              last_error_message: sanitize_smtp_response(rl.last_error_message),
               created_at: rl.created_at,
               updated_at: rl.updated_at
             }
@@ -241,7 +241,7 @@ class MXRateLimitsController < ApplicationController
             success_count: rate_limit.success_count,
             last_error_at: rate_limit.last_error_at,
             last_success_at: rate_limit.last_success_at,
-            last_error_message: rate_limit.last_error_message,
+            last_error_message: sanitize_smtp_response(rate_limit.last_error_message),
             created_at: rate_limit.created_at,
             updated_at: rate_limit.updated_at
           },
