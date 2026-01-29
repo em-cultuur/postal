@@ -255,38 +255,55 @@ class SMTPSender < BaseSender
   # @param soft_bounce [Boolean] Whether this is a soft bounce
   #
   def handle_smtp_error_response(exception, soft_bounce:)
-    return unless smtp_response_analysis_enabled? # Check if feature is enabled
+    logger.info "[SMTP BLACKLIST] Starting SMTP error response analysis (soft_bounce: #{soft_bounce})"
+
+    unless smtp_response_analysis_enabled?
+      logger.info "[SMTP BLACKLIST] Analysis disabled in configuration"
+      return
+    end
 
     # Try to get source IP address
     source_ip = @source_ip_address
 
     # If no IP address is set, try to extract it from the SMTP error message
     if source_ip.nil?
+      logger.info "[SMTP BLACKLIST] No source_ip_address set, attempting extraction from error message"
       extracted_ip = extract_ip_from_smtp_message(exception.message)
       if extracted_ip
+        logger.info "[SMTP BLACKLIST] Extracted IP: #{extracted_ip}"
         source_ip = find_ip_address_by_ip(extracted_ip)
         if source_ip
-          logger.info "[SMTP BLACKLIST] Extracted IP #{extracted_ip} from SMTP error message"
+          logger.info "[SMTP BLACKLIST] Found IP in database: #{source_ip.ipv4} (ID: #{source_ip.id})"
         else
           logger.warn "[SMTP BLACKLIST] Extracted IP #{extracted_ip} from SMTP error but not found in database"
           return
         end
       else
-        logger.debug "[SMTP BLACKLIST] No source IP address available and unable to extract from SMTP message"
+        logger.warn "[SMTP BLACKLIST] Could not extract IP address from SMTP error message"
         return
       end
+    else
+      logger.info "[SMTP BLACKLIST] Using source_ip_address: #{source_ip.ipv4} (ID: #{source_ip.id})"
     end
 
     # Extract SMTP code from exception message
     smtp_code = extract_smtp_code(exception.message)
-    return unless smtp_code
+    unless smtp_code
+      logger.warn "[SMTP BLACKLIST] Could not extract SMTP code from error message"
+      return
+    end
+
+    logger.info "[SMTP BLACKLIST] SMTP code: #{smtp_code}"
 
     # Parse the SMTP response
     parsed = IPBlacklist::SMTPResponseParser.parse(exception.message, smtp_code)
+    logger.info "[SMTP BLACKLIST] Parse result - blacklist_detected: #{parsed[:blacklist_detected]}, source: #{parsed[:source]}, severity: #{parsed[:severity]}"
 
     # Handle based on blacklist detection and bounce type
     if parsed[:blacklist_detected]
       handle_blacklist_detected_in_smtp(parsed, smtp_code, exception.message, soft_bounce, source_ip)
+    else
+      logger.info "[SMTP BLACKLIST] No blacklist pattern detected in SMTP response"
     end
   rescue StandardError => e
     # Don't let SMTP analysis errors break the main flow
