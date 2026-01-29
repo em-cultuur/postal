@@ -98,7 +98,9 @@ class SMTPSender < BaseSender
     @current_endpoint.reset_smtp_session
 
     # Parse SMTP response for blacklist detection (soft bounce)
+    logger.info "About to call handle_smtp_error_response (soft bounce)"
     handle_smtp_error_response(e, soft_bounce: true)
+    logger.info "Finished handle_smtp_error_response (soft bounce)"
 
     create_result("SoftFail", start_time) do |r|
       r.details = "Temporary SMTP delivery error when sending to #{@current_endpoint}"
@@ -123,7 +125,9 @@ class SMTPSender < BaseSender
     @current_endpoint.reset_smtp_session
 
     # Parse SMTP response for blacklist detection (hard bounce)
+    logger.info "About to call handle_smtp_error_response (hard bounce)"
     handle_smtp_error_response(e, soft_bounce: false)
+    logger.info "Finished handle_smtp_error_response (hard bounce)"
 
     create_result("HardFail", start_time) do |r|
       r.details = "Permanent SMTP delivery error when sending to #{@current_endpoint}"
