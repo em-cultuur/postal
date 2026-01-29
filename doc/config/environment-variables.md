@@ -33,6 +33,15 @@ This document contains all the environment variables which are available for thi
 | `POSTAL_MX_RATE_LIMITING_CLEANUP_INTERVAL` | Integer | Cleanup task interval in seconds | 3600 |
 | `POSTAL_MX_RATE_LIMITING_EVENT_RETENTION_DAYS` | Integer | Number of days to retain MX rate limit events | 30 |
 | `POSTAL_MX_RATE_LIMITING_INACTIVE_CLEANUP_HOURS` | Integer | Hours after last success before cleaning up inactive rate limits | 24 |
+| `POSTAL_MX_RATE_LIMITING_ABANDONED_MULTIPLIER` | Integer | Multiplier for current_delay to determine abandoned rate limit cleanup threshold (if no activity for delay * multiplier, delete the record even if active) | 3 |
+| `POSTAL_MX_RATE_LIMITING_ABANDONED_MIN_HOURS` | Integer | Minimum hours before an active rate limit can be considered abandoned (prevents premature cleanup of short delays) | 48 |
+| `POSTAL_MX_RATE_LIMITING_THROTTLED_EVENT_WINDOW` | Integer | Seconds to wait before logging another throttled event for the same MX domain (prevents flood of duplicate events) | 300 |
+| `POSTAL_IP_REPUTATION_SMTP_ANALYSIS_ENABLED` | Boolean | Enable automatic analysis of SMTP error responses for blacklist indicators | true |
+| `POSTAL_IP_REPUTATION_SOFT_BOUNCE_THRESHOLD` | Integer | Number of soft bounces (421, 450, 451, 452) within the time window before pausing IP for that domain | 5 |
+| `POSTAL_IP_REPUTATION_SOFT_BOUNCE_WINDOW_MINUTES` | Integer | Time window in minutes for counting soft bounces | 60 |
+| `POSTAL_IP_REPUTATION_NOTIFICATION_WEBHOOKS` | Array of strings | Webhook URLs to notify when IP reputation events occur | [] |
+| `POSTAL_IP_REPUTATION_NOTIFICATION_EMAILS` | Array of strings | Email addresses to notify when IP reputation events occur (NOT YET IMPLEMENTED) | [] |
+| `POSTAL_IP_REPUTATION_NOTIFICATION_SLACK_WEBHOOK` | String | Slack webhook URL to send notifications to |  |
 | `WEB_SERVER_DEFAULT_PORT` | Integer | The default port the web server should listen on unless overriden by the PORT environment variable | 5000 |
 | `WEB_SERVER_DEFAULT_BIND_ADDRESS` | String | The default bind address the web server should listen on unless overriden by the BIND_ADDRESS environment variable | 127.0.0.1 |
 | `WEB_SERVER_MAX_THREADS` | Integer | The maximum number of threads which can be used by the web server | 5 |

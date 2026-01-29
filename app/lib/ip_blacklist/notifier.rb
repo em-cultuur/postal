@@ -15,11 +15,12 @@ module IPBlacklist
   # - Slack notifications (via webhook)
   #
   # Configuration:
-  #   Postal.config.ip_reputation.notifications = {
-  #     webhooks: ["https://example.com/webhook"],
-  #     email_addresses: ["admin@example.com"],
-  #     slack_webhook_url: "https://hooks.slack.com/services/..."
-  #   }
+  #   postal:
+  #     ip_reputation_notification_webhooks:
+  #       - https://example.com/webhook
+  #     ip_reputation_notification_emails:
+  #       - admin@example.com
+  #     ip_reputation_notification_slack_webhook: https://hooks.slack.com/services/...
   #
   # Usage:
   #   notifier = IPBlacklist::Notifier.new
@@ -30,7 +31,11 @@ module IPBlacklist
     attr_reader :config
 
     def initialize
-      @config = Postal::Config.ip_reputation&.notifications || {}
+      @config = {
+        webhooks: Array(Postal::Config.postal&.ip_reputation_notification_webhooks || []),
+        email_addresses: Array(Postal::Config.postal&.ip_reputation_notification_emails || []),
+        slack_webhook_url: Postal::Config.postal&.ip_reputation_notification_slack_webhook
+      }
     end
 
     # Notify when an IP is detected on a blacklist

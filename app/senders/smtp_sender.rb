@@ -259,10 +259,7 @@ class SMTPSender < BaseSender
   # @param soft_bounce [Boolean] Whether this is a soft bounce
   #
   def handle_smtp_error_response(exception, soft_bounce:)
-    logger.info "[SMTP BLACKLIST] Starting SMTP error response analysis (soft_bounce: #{soft_bounce})"
-
     unless smtp_response_analysis_enabled?
-      logger.info "[SMTP BLACKLIST] Analysis disabled in configuration"
       return
     end
 
@@ -271,43 +268,31 @@ class SMTPSender < BaseSender
 
     # If no IP address is set, try to extract it from the SMTP error message
     if source_ip.nil?
-      logger.info "[SMTP BLACKLIST] No source_ip_address set, attempting extraction from error message"
       extracted_ip = extract_ip_from_smtp_message(exception.message)
       if extracted_ip
-        logger.info "[SMTP BLACKLIST] Extracted IP: #{extracted_ip}"
         source_ip = find_ip_address_by_ip(extracted_ip)
-        if source_ip
-          logger.info "[SMTP BLACKLIST] Found IP in database: #{source_ip.ipv4} (ID: #{source_ip.id})"
-        else
-          logger.warn "[SMTP BLACKLIST] Extracted IP #{extracted_ip} from SMTP error but not found in database"
+        unless source_ip
+          logger.debug "[SMTP BLACKLIST] Extracted IP #{extracted_ip} not found in database"
           return
         end
       else
-        logger.warn "[SMTP BLACKLIST] Could not extract IP address from SMTP error message"
+        logger.debug "[SMTP BLACKLIST] Could not extract IP from error message"
         return
       end
-    else
-      logger.info "[SMTP BLACKLIST] Using source_ip_address: #{source_ip.ipv4} (ID: #{source_ip.id})"
     end
 
     # Extract SMTP code from exception message
     smtp_code = extract_smtp_code(exception.message)
     unless smtp_code
-      logger.warn "[SMTP BLACKLIST] Could not extract SMTP code from error message"
       return
     end
 
-    logger.info "[SMTP BLACKLIST] SMTP code: #{smtp_code}"
-
     # Parse the SMTP response
     parsed = IPBlacklist::SMTPResponseParser.parse(exception.message, smtp_code)
-    logger.info "[SMTP BLACKLIST] Parse result - blacklist_detected: #{parsed[:blacklist_detected]}, source: #{parsed[:source]}, severity: #{parsed[:severity]}"
 
     # Handle based on blacklist detection and bounce type
     if parsed[:blacklist_detected]
       handle_blacklist_detected_in_smtp(parsed, smtp_code, exception.message, soft_bounce, source_ip)
-    else
-      logger.info "[SMTP BLACKLIST] No blacklist pattern detected in SMTP response"
     end
   rescue StandardError => e
     # Don't let SMTP analysis errors break the main flow
@@ -324,7 +309,7 @@ class SMTPSender < BaseSender
   # @param source_ip [IPAddress] The source IP address (either from @source_ip_address or extracted)
   #
   def handle_blacklist_detected_in_smtp(parsed, smtp_code, smtp_message, soft_bounce, source_ip)
-    logger.warn "[SMTP BLACKLIST] Detected #{parsed[:severity]} severity blacklist indicator: #{parsed[:description]}"
+    logger.warn "[SMTP BLACKLIST] Detected on IP #{source_ip.ipv4} for #{@domain}: #{parsed[:description]} (#{parsed[:severity]} severity)"
 
     if soft_bounce
       # Track soft bounces and check threshold
@@ -336,18 +321,16 @@ class SMTPSender < BaseSender
       )
 
       if tracker.record_and_check_threshold
-        logger.warn "[SMTP BLACKLIST] Soft bounce threshold exceeded for IP #{source_ip.ipv4} on domain #{@domain}"
+        logger.warn "[SMTP BLACKLIST] Soft bounce threshold exceeded (#{tracker.current_count}/#{tracker.threshold}) - pausing IP #{source_ip.ipv4} for #{@domain}"
         IPBlacklist::IPHealthManager.handle_excessive_soft_bounces(
           source_ip,
           @domain,
           reason: "Soft bounce threshold exceeded: #{parsed[:description]}"
         )
-      else
-        logger.info "[SMTP BLACKLIST] Soft bounce recorded (#{tracker.current_count}/#{tracker.threshold}) for IP #{source_ip.ipv4} on domain #{@domain}"
       end
     elsif parsed[:severity] == "high"
       # Hard bounce - take immediate action if severity is high
-      logger.warn "[SMTP BLACKLIST] High severity hard bounce - pausing IP #{source_ip.ipv4} for domain #{@domain}"
+      logger.warn "[SMTP BLACKLIST] High severity hard bounce - pausing IP #{source_ip.ipv4} for #{@domain}"
       IPBlacklist::IPHealthManager.handle_smtp_rejection(
         source_ip,
         @domain,
@@ -355,8 +338,6 @@ class SMTPSender < BaseSender
         smtp_code,
         smtp_message
       )
-    else
-      logger.info "[SMTP BLACKLIST] #{parsed[:severity].capitalize} severity hard bounce detected for IP #{source_ip.ipv4} - monitoring"
     end
   end
 

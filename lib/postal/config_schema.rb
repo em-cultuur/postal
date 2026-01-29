@@ -181,6 +181,35 @@ module Postal
         description "Seconds to wait before logging another throttled event for the same MX domain (prevents flood of duplicate events)"
         default 300
       end
+
+      boolean :ip_reputation_smtp_analysis_enabled do
+        description "Enable automatic analysis of SMTP error responses for blacklist indicators"
+        default true
+      end
+
+      integer :ip_reputation_soft_bounce_threshold do
+        description "Number of soft bounces (421, 450, 451, 452) within the time window before pausing IP for that domain"
+        default 5
+      end
+
+      integer :ip_reputation_soft_bounce_window_minutes do
+        description "Time window in minutes for counting soft bounces"
+        default 60
+      end
+
+      string :ip_reputation_notification_webhooks do
+        array
+        description "Webhook URLs to notify when IP reputation events occur"
+      end
+
+      string :ip_reputation_notification_emails do
+        array
+        description "Email addresses to notify when IP reputation events occur (NOT YET IMPLEMENTED)"
+      end
+
+      string :ip_reputation_notification_slack_webhook do
+        description "Slack webhook URL to send notifications to"
+      end
     end
 
     group :web_server do

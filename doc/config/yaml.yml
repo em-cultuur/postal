@@ -71,6 +71,12 @@ postal:
   ip_reputation_soft_bounce_threshold: 5
   # Time window in minutes for counting soft bounces
   ip_reputation_soft_bounce_window_minutes: 60
+  # Webhook URLs to notify when IP reputation events occur
+  ip_reputation_notification_webhooks: []
+  # Email addresses to notify when IP reputation events occur (NOT YET IMPLEMENTED)
+  ip_reputation_notification_emails: []
+  # Slack webhook URL to send notifications to
+  ip_reputation_notification_slack_webhook: 
 
 web_server:
   # The default port the web server should listen on unless overriden by the PORT environment variable
