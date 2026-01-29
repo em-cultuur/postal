@@ -40,6 +40,9 @@ class MXRateLimit < ApplicationRecord
 
   belongs_to :server
 
+  # Delete associated events when rate limit is destroyed
+  before_destroy :delete_associated_events
+
   # Events are associated by server_id and mx_domain (no direct foreign key)
   # Use MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain)
   # to query events for this rate limit
@@ -117,13 +120,62 @@ class MXRateLimit < ApplicationRecord
   end
 
   # Remove inactive rate limits (delay=0, last_success > cleanup threshold)
+  # Also removes abandoned active rate limits (delay>0 but no activity for delay * multiplier)
   #
   # @return [Integer] the number of records deleted
   def self.cleanup_inactive
+    deleted_count = 0
+
+    # Cleanup inactive rate limits (delay=0)
+    # Use destroy_all to trigger callbacks and clean up associated events
     cleanup_hours = Postal::Config.postal.mx_rate_limiting_inactive_cleanup_hours
-    inactive
-      .where("last_success_at < ?", cleanup_hours.hours.ago)
-      .delete_all
+    inactive_records = inactive
+                       .where("last_success_at < ?", cleanup_hours.hours.ago)
+                       .to_a
+    deleted_count += inactive_records.size
+    inactive_records.each(&:destroy)
+
+    # Cleanup abandoned active rate limits (delay>0 but no recent activity)
+    deleted_count += cleanup_abandoned
+
+    deleted_count
+  end
+
+  # Remove abandoned active rate limits that have had no activity for a long time
+  # Criteria: current_delay > 0 AND last_activity_at < (current_delay * multiplier) ago
+  # Also applies a minimum threshold to prevent premature cleanup of short delays
+  #
+  # @return [Integer] the number of records deleted
+  def self.cleanup_abandoned
+    multiplier = Postal::Config.postal.mx_rate_limiting_abandoned_multiplier
+    min_hours = Postal::Config.postal.mx_rate_limiting_abandoned_min_hours
+    min_threshold_seconds = min_hours.hours.to_i
+
+    deleted_count = 0
+
+    # Process in batches to avoid loading all records at once
+    active.find_each do |rate_limit|
+      # Calculate the most recent activity timestamp
+      last_activity = [rate_limit.last_success_at, rate_limit.last_error_at].compact.max
+
+      # Skip if no activity recorded (shouldn't happen, but be safe)
+      next unless last_activity
+
+      # Calculate time since last activity in seconds
+      time_since_activity = (Time.current - last_activity).to_i
+
+      # Calculate the abandonment threshold (max of delay-based and minimum absolute)
+      delay_based_threshold = rate_limit.current_delay * multiplier
+      abandonment_threshold = [delay_based_threshold, min_threshold_seconds].max
+
+      # Delete if abandoned
+      if time_since_activity >= abandonment_threshold
+        rate_limit.destroy
+        deleted_count += 1
+      end
+    end
+
+    deleted_count
   end
 
   # Record an error and apply rate limiting
@@ -268,6 +320,16 @@ class MXRateLimit < ApplicationRecord
 
     time_since_last_attempt = Time.current - last_error_at
     time_since_last_attempt >= current_delay
+  end
+
+  private
+
+  # Delete all associated events when the rate limit is destroyed
+  # This callback ensures events don't become orphaned
+  #
+  # @return [void]
+  def delete_associated_events
+    events.delete_all
   end
 
 end

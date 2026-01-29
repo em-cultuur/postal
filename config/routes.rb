@@ -60,9 +60,9 @@ Rails.application.routes.draw do
         get :history, on: :collection
         get "history/:uuid", on: :collection, action: "history_request", as: "history_request"
       end
-      resources :mx_rate_limits, only: [:index] do
+      resources :mx_rate_limits, only: [:index, :destroy], constraints: { id: /[^\/]+/ } do
         get :summary, on: :collection
-        get :stats, on: :member, constraints: { id: /[^\/]+/ }
+        get :stats, on: :member
       end
       get :limits, on: :member
       get :retention, on: :member
@@ -93,6 +93,10 @@ Rails.application.routes.draw do
     resources :ip_addresses
   end
 
+  # Admin Dashboard
+  get "admin/dashboard" => "admin_dashboard#index", as: "admin_dashboard"
+  get "admin/mx_rate_limits" => "admin_mx_rate_limits#index", as: "admin_mx_rate_limits"
+
   # IP Reputation Management (Phase 8)
   resources :ip_reputation, only: [:index] do
     collection do
@@ -109,6 +113,7 @@ Rails.application.routes.draw do
       post :unpause
       post :advance_warmup
       post :reset_warmup
+      match :move, via: [:get, :post]
     end
   end
 

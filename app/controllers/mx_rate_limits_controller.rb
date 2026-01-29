@@ -32,7 +32,7 @@ class MXRateLimitsController < ApplicationController
               success_count: rl.success_count,
               last_error_at: rl.last_error_at,
               last_success_at: rl.last_success_at,
-              last_error_message: rl.last_error_message,
+              last_error_message: sanitize_smtp_response(rl.last_error_message),
               created_at: rl.created_at,
               updated_at: rl.updated_at
             }
@@ -172,6 +172,39 @@ class MXRateLimitsController < ApplicationController
     end
   end
 
+  def destroy
+    mx_domain = params[:id]
+
+    # Validate domain format to prevent injection attacks
+    unless mx_domain.match?(/\A[a-zA-Z0-9.-]{1,255}\z/)
+      respond_to do |wants|
+        wants.json do
+          render json: { error: "Invalid request" }, status: :unprocessable_entity
+        end
+      end
+      return
+    end
+
+    rate_limit = @server.mx_rate_limits.find_by(mx_domain: mx_domain)
+
+    if rate_limit.nil?
+      respond_to do |wants|
+        wants.json do
+          render json: { error: "Not found" }, status: :not_found
+        end
+      end
+      return
+    end
+
+    rate_limit.destroy
+
+    respond_to do |wants|
+      wants.json do
+        render json: { message: "MX rate limit deleted successfully" }, status: :ok
+      end
+    end
+  end
+
   def stats
     mx_domain = params[:id]
 
@@ -201,24 +234,24 @@ class MXRateLimitsController < ApplicationController
     respond_to do |wants|
       wants.json do
         render json: {
-           rate_limit: {
-             mx_domain: rate_limit.mx_domain,
-             current_delay_seconds: rate_limit.current_delay,
-             error_count: rate_limit.error_count,
-             success_count: rate_limit.success_count,
-             last_error_at: rate_limit.last_error_at,
-             last_success_at: rate_limit.last_success_at,
-             last_error_message: sanitize_smtp_response(rate_limit.last_error_message),
-             created_at: rate_limit.created_at,
-             updated_at: rate_limit.updated_at
-           },
-           events_last_24h: recent_events.map do |event|
-             {
-               event_type: event.event_type,
-               smtp_response: sanitize_smtp_response(event.smtp_response),
-               created_at: event.created_at
-             }
-           end
+          rate_limit: {
+            mx_domain: rate_limit.mx_domain,
+            current_delay_seconds: rate_limit.current_delay,
+            error_count: rate_limit.error_count,
+            success_count: rate_limit.success_count,
+            last_error_at: rate_limit.last_error_at,
+            last_success_at: rate_limit.last_success_at,
+            last_error_message: sanitize_smtp_response(rate_limit.last_error_message),
+            created_at: rate_limit.created_at,
+            updated_at: rate_limit.updated_at
+          },
+          events_last_24h: recent_events.map do |event|
+            {
+              event_type: event.event_type,
+              smtp_response: event.smtp_response,
+              created_at: event.created_at
+            }
+          end
         }
       end
     end

@@ -61,6 +61,7 @@
                 %th Error Count
                 %th Success Count
                 %th Last Error
+                %th Last Success
                 %th Status
                 %th Actions
             %tbody
@@ -81,6 +82,13 @@
                     - else
                       %span.mxRateLimitingDashboard__noData --
                   %td.dataTable__centerCell
+                    - if rate_limit.last_success_at
+                      %span.mxRateLimitingDashboard__timestamp{:title => rate_limit.last_success_at.to_s}
+                        = time_ago_in_words(rate_limit.last_success_at)
+                        ago
+                    - else
+                      %span.mxRateLimitingDashboard__noData --
+                  %td.dataTable__centerCell
                     - if rate_limit.current_delay > 0
                       %span.label.label--warning Throttled
                     - else
@@ -88,6 +96,9 @@
                   %td.dataTable__centerCell
                     %a.mxRateLimitingDashboard__viewLink{:href => "#", "data-mx-domain" => rate_limit.mx_domain, :class => "js-view-details"}
                       View Details
+                    %span.mxRateLimitingDashboard__actionSeparator |
+                    %a.mxRateLimitingDashboard__deleteLink{:href => "#", "data-mx-domain" => rate_limit.mx_domain, :class => "js-delete-rate-limit"}
+                      Delete
 
       / Recent Events Section
       - if @recent_events.empty?
@@ -161,4 +172,39 @@
       %p
         When enabled, the system will automatically detect and handle rate limiting responses from mail servers
         using linear backoff and gradual recovery strategies.
+
+/ MX Details Modal
+#mxDetailsModal.modal{:style => "display: none;"}
+  .modal__overlay.js-close-modal
+  .modal__content
+    .modal__header
+      %h3.modal__title MX Rate Limit Details
+      %button.modal__close.js-close-modal &times;
+    .modal__body
+      .mxDetailsModal__loading{:style => "display: none;"}
+        %p Loading...
+      .mxDetailsModal__error{:style => "display: none;"}
+        %p.error An error occurred loading the details.
+      .mxDetailsModal__content{:style => "display: none;"}
+        .mxDetailsModal__summary
+          %dl.mxDetailsModal__details
+            %dt MX Domain
+            %dd
+              %code.js-mx-domain
+            %dt Current Delay
+            %dd.js-current-delay
+            %dt Error Count
+            %dd.js-error-count
+            %dt Success Count
+            %dd.js-success-count
+            %dt Last Error
+            %dd.js-last-error
+            %dt Last Success
+            %dd.js-last-success
+            %dt Last Error Message
+            %dd
+              %code.js-last-error-message
+        .mxDetailsModal__events
+          %h4 Recent Events (Last 24 Hours)
+          .js-events-container
 

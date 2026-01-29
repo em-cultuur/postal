@@ -167,6 +167,16 @@ module Postal
         default 24
       end
 
+      integer :mx_rate_limiting_abandoned_multiplier do
+        description "Multiplier for current_delay to determine abandoned rate limit cleanup threshold (if no activity for delay * multiplier, delete the record even if active)"
+        default 3
+      end
+
+      integer :mx_rate_limiting_abandoned_min_hours do
+        description "Minimum hours before an active rate limit can be considered abandoned (prevents premature cleanup of short delays)"
+        default 48
+      end
+
       integer :mx_rate_limiting_throttled_event_window do
         description "Seconds to wait before logging another throttled event for the same MX domain (prevents flood of duplicate events)"
         default 300

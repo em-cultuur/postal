@@ -89,6 +89,35 @@
   padding: 20px 0 !important;
 }
 
+// Override Chartist default colors to match legend
+#mxRateLimitingChart {
+
+  .ct-series-a .ct-point,
+  .ct-series-a .ct-line,
+  .ct-series-a .ct-bar,
+  .ct-series-a .ct-slice-donut {
+    stroke: #d52b1e; // Errors - red
+  }
+
+  .ct-series-a .ct-slice-pie,
+  .ct-series-a .ct-area {
+    fill: #d52b1e;
+  }
+
+  .ct-series-b .ct-point,
+  .ct-series-b .ct-line,
+  .ct-series-b .ct-bar,
+  .ct-series-b .ct-slice-donut {
+    stroke: #68a357; // Successes - green
+  }
+
+  .ct-series-b .ct-slice-pie,
+  .ct-series-b .ct-area {
+    fill: #68a357;
+  }
+
+}
+
 .mxRateLimitingDashboard__chartLegend {
   padding: 0 20px 10px 20px;
   display: flex;
@@ -216,6 +245,24 @@
   }
 }
 
+.mxRateLimitingDashboard__actionSeparator {
+  margin: 0 8px;
+  color: #ddd;
+}
+
+.mxRateLimitingDashboard__deleteLink {
+  color: #c62828;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #8b1c1c;
+    text-decoration: underline;
+  }
+}
+
 // Configuration Info
 .mxRateLimitingDashboard__info {
   background: #fff;
@@ -286,6 +333,159 @@
     display: block;
     margin-left: 0;
     margin-top: 10px;
+  }
+}
+
+// Modal Styles
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+}
+
+.modal__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal__content {
+  position: relative;
+  max-width: 900px;
+  max-height: 90vh;
+  margin: 5vh auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal__header {
+  padding: 20px 30px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+  border-bottom: 2px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.modal__close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #333;
+  }
+}
+
+.modal__body {
+  padding: 30px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.mxDetailsModal__loading,
+.mxDetailsModal__error {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 16px;
+  color: #666;
+}
+
+.mxDetailsModal__error {
+  color: #c62828;
+}
+
+.mxDetailsModal__summary {
+  margin-bottom: 30px;
+}
+
+.mxDetailsModal__details {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 15px;
+  margin: 0;
+
+  dt {
+    font-weight: 600;
+    color: #333;
+    padding: 8px 0;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  dd {
+    margin: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid #e0e0e0;
+    color: #666;
+    font-family: monospace;
+    font-size: 13px;
+  }
+}
+
+.mxDetailsModal__events {
+  h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ddd;
+  }
+
+  .dataTable {
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal__content {
+    max-width: 95%;
+    margin: 2vh auto;
+    max-height: 96vh;
+  }
+
+  .modal__header {
+    padding: 15px 20px;
+  }
+
+  .modal__body {
+    padding: 20px;
+  }
+
+  .mxDetailsModal__details {
+    grid-template-columns: 1fr;
+
+    dt {
+      font-weight: 700;
+      margin-top: 10px;
+    }
   }
 }
 

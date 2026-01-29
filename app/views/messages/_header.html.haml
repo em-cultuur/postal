@@ -6,4 +6,6 @@
     %li.navBar__item= link_to "Held", [:held, organization, @server, :messages], :class => ['navBar__link', active_nav == :held ? 'is-active' : '']
     %li.navBar__item= link_to "Send Message", [:new, organization, @server, :message], :class => ['navBar__link', active_nav == :new ? 'is-active' : '']
     %li.navBar__item= link_to "Suppressions", [:suppressions, organization, @server, :messages], :class => ['navBar__link', active_nav == :suppressions ? 'is-active' : '']
-    %li.navBar__item= link_to "Throttled Domains", [:throttled_domains, organization, @server, :messages], :class => ['navBar__link', active_nav == :throttled_domains ? 'is-active' : '']
+    - if Postal::Config.postal.domain_throttling_enabled?
+      %li.navBar__item= link_to "Throttled Domains", [:throttled_domains, organization, @server, :messages], :class => ['navBar__link', active_nav == :throttled_domains ? 'is-active' : '']
+

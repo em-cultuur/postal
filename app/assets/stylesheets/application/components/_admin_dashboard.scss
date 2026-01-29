@@ -1,0 +1,201 @@
+.adminDashboard__totals {
+  margin-bottom: 40px;
+}
+
+.adminDashboard__totalsTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: $darkBlue;
+}
+
+.adminDashboard__totalsBoxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.adminDashboard__statsCard {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  border-left: 4px solid $blue;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.adminDashboard__statsCard--held {
+  border-left-color: $orange;
+}
+
+.adminDashboard__statsCard--queue {
+  border-left-color: $blue;
+}
+
+.adminDashboard__statsCard--bounces {
+  border-left-color: $red;
+}
+
+.adminDashboard__statsCard--size {
+  border-left-color: $purple;
+}
+
+.adminDashboard__statsCard--incoming {
+  border-left-color: $green;
+}
+
+.adminDashboard__statsCard--outgoing {
+  border-left-color: $turquoise;
+}
+
+.adminDashboard__statsCard--rate {
+  border-left-color: $blue;
+}
+
+.adminDashboard__statsCard--servers {
+  border-left-color: $darkBlue;
+}
+
+.adminDashboard__statsValue {
+  font-size: 32px;
+  font-weight: 700;
+  color: $darkBlue;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.adminDashboard__statsLabel {
+  font-size: 12px;
+  font-weight: 400;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.adminDashboard__serversTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 25px;
+  color: $darkBlue;
+}
+
+.adminDashboard__serversList {
+  margin-bottom: 30px;
+}
+
+.adminDashboard__organization {
+  margin-bottom: 40px;
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.adminDashboard__organizationName {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: $darkBlue;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  a {
+    color: $darkBlue;
+    text-decoration: none;
+
+    &:hover {
+      color: $blue;
+      text-decoration: underline;
+    }
+  }
+}
+
+.adminDashboard__organizationServerCount {
+  font-size: 12px;
+  font-weight: 400;
+  color: #999;
+  background: $backgroundGrey;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.adminDashboard__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.adminDashboard__tableHeader {
+  background: $backgroundGrey;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: $darkBlue;
+  border-bottom: 2px solid #ddd;
+
+  &.u-center {
+    text-align: center;
+  }
+}
+
+.adminDashboard__tableRow {
+  border-bottom: 1px solid #eee;
+
+  &:hover {
+    background: $lightBlue;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.adminDashboard__tableCell {
+  padding: 12px;
+  vertical-align: middle;
+
+  a {
+    color: $blue;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &.u-center {
+    text-align: center;
+  }
+}
+
+.adminDashboard__status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #636363;
+  color: #fff;
+}
+
+.adminDashboard__status--live {
+  background-color: $green;
+}
+
+.adminDashboard__status--suspended {
+  background-color: $red;
+}
+
+.adminDashboard__status--development {
+  background-color: $orange;
+}

@@ -116,6 +116,166 @@ RSpec.describe MXRateLimit do
       expect(MXRateLimit.exists?(inactive_recent.id)).to be true
       expect(MXRateLimit.exists?(active.id)).to be true
     end
+
+    it "removes abandoned active rate limits (no activity for delay * multiplier)" do
+      # Active rate limit with delay=3600s (1h), last activity 11h ago
+      # With multiplier=3, threshold is 3h, so 11h > 3h -> should be deleted
+      # But minimum is 48h (2 days), so it should NOT be deleted yet
+      active_recent = MXRateLimit.create!(
+        server: server,
+        mx_domain: "active-recent.com",
+        current_delay: 3600, # 1 hour
+        last_success_at: 11.hours.ago,
+        last_error_at: 12.hours.ago
+      )
+
+      # Active rate limit with delay=3600s (1h), last activity 3 days ago
+      # Minimum threshold is 48h (2 days), so it should be deleted
+      active_old = MXRateLimit.create!(
+        server: server,
+        mx_domain: "active-old.com",
+        current_delay: 3600, # 1 hour
+        last_success_at: 3.days.ago,
+        last_error_at: 4.days.ago
+      )
+
+      # Active rate limit with delay=7200s (2h), last activity 1 day ago
+      # Minimum threshold is 48h (2 days), so should NOT be deleted yet
+      active_medium = MXRateLimit.create!(
+        server: server,
+        mx_domain: "active-medium.com",
+        current_delay: 7200, # 2 hours
+        last_success_at: 1.day.ago
+      )
+
+      deleted_count = MXRateLimit.cleanup_inactive
+
+      expect(deleted_count).to eq(1)
+      expect(MXRateLimit.exists?(active_recent.id)).to be true
+      expect(MXRateLimit.exists?(active_old.id)).to be false
+      expect(MXRateLimit.exists?(active_medium.id)).to be true
+    end
+
+    it "uses last_success_at when last_error_at is nil" do
+      active_old = MXRateLimit.create!(
+        server: server,
+        mx_domain: "success-only.com",
+        current_delay: 300,
+        last_success_at: 3.days.ago,
+        last_error_at: nil
+      )
+
+      deleted_count = MXRateLimit.cleanup_inactive
+
+      expect(deleted_count).to eq(1)
+      expect(MXRateLimit.exists?(active_old.id)).to be false
+    end
+
+    it "uses last_error_at when last_success_at is nil" do
+      active_old = MXRateLimit.create!(
+        server: server,
+        mx_domain: "error-only.com",
+        current_delay: 300,
+        last_success_at: nil,
+        last_error_at: 3.days.ago
+      )
+
+      deleted_count = MXRateLimit.cleanup_inactive
+
+      expect(deleted_count).to eq(1)
+      expect(MXRateLimit.exists?(active_old.id)).to be false
+    end
+
+    it "uses the most recent timestamp when both are present" do
+      # Last error was 4 days ago but last success was 1 day ago
+      # Should use 1 day (more recent), so NOT deleted yet (< 48h minimum)
+      active_mixed = MXRateLimit.create!(
+        server: server,
+        mx_domain: "mixed.com",
+        current_delay: 300,
+        last_success_at: 1.day.ago,
+        last_error_at: 4.days.ago
+      )
+
+      deleted_count = MXRateLimit.cleanup_inactive
+
+      expect(deleted_count).to eq(0)
+      expect(MXRateLimit.exists?(active_mixed.id)).to be true
+    end
+
+    it "combines inactive and abandoned cleanup counts" do
+      # Inactive old
+      inactive_old = MXRateLimit.create!(
+        server: server,
+        mx_domain: "inactive-old.com",
+        current_delay: 0,
+        last_success_at: 25.hours.ago
+      )
+
+      # Abandoned active
+      active_old = MXRateLimit.create!(
+        server: server,
+        mx_domain: "active-old.com",
+        current_delay: 300,
+        last_success_at: 3.days.ago
+      )
+
+      # Should delete both
+      deleted_count = MXRateLimit.cleanup_inactive
+
+      expect(deleted_count).to eq(2)
+      expect(MXRateLimit.exists?(inactive_old.id)).to be false
+      expect(MXRateLimit.exists?(active_old.id)).to be false
+    end
+  end
+
+  describe ".cleanup_abandoned" do
+    it "returns count of deleted abandoned rate limits" do
+      MXRateLimit.create!(
+        server: server,
+        mx_domain: "abandoned1.com",
+        current_delay: 300,
+        last_success_at: 3.days.ago
+      )
+      MXRateLimit.create!(
+        server: server,
+        mx_domain: "abandoned2.com",
+        current_delay: 600,
+        last_error_at: 3.days.ago
+      )
+
+      deleted_count = MXRateLimit.cleanup_abandoned
+
+      expect(deleted_count).to eq(2)
+    end
+
+    it "does not delete active rate limits with recent activity" do
+      recent = MXRateLimit.create!(
+        server: server,
+        mx_domain: "recent.com",
+        current_delay: 300,
+        last_success_at: 1.day.ago
+      )
+
+      deleted_count = MXRateLimit.cleanup_abandoned
+
+      expect(deleted_count).to eq(0)
+      expect(MXRateLimit.exists?(recent.id)).to be true
+    end
+
+    it "does not delete inactive rate limits (delay=0)" do
+      inactive = MXRateLimit.create!(
+        server: server,
+        mx_domain: "inactive.com",
+        current_delay: 0,
+        last_success_at: 10.days.ago
+      )
+
+      deleted_count = MXRateLimit.cleanup_abandoned
+
+      expect(deleted_count).to eq(0)
+      expect(MXRateLimit.exists?(inactive.id)).to be true
+    end
   end
 
   describe "#record_error" do
@@ -298,6 +458,73 @@ RSpec.describe MXRateLimit do
       it "returns only rate limits with current_delay = 0" do
         expect(MXRateLimit.inactive).to contain_exactly(@inactive1, @inactive2)
       end
+    end
+  end
+
+  describe "destroying rate limits and associated events" do
+    let(:rate_limit) { create(:mx_rate_limit, server: server, mx_domain: "test.com") }
+
+    before do
+      # Create some events for this rate limit
+      3.times do |i|
+        MXRateLimitEvent.create!(
+          server_id: rate_limit.server_id,
+          mx_domain: rate_limit.mx_domain,
+          event_type: "error",
+          delay_before: i * 100,
+          delay_after: (i + 1) * 100,
+          created_at: i.hours.ago
+        )
+      end
+    end
+
+    it "deletes associated events when rate limit is manually destroyed" do
+      expect do
+        rate_limit.destroy
+      end.to change { MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain).count }.from(3).to(0)
+    end
+
+    it "deletes associated events when rate limit is cleaned up by cleanup_inactive" do
+      rate_limit.update(current_delay: 0, last_success_at: 25.hours.ago)
+
+      expect do
+        MXRateLimit.cleanup_inactive
+      end.to change { MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain).count }.from(3).to(0)
+    end
+
+    it "deletes associated events when rate limit is cleaned up by cleanup_abandoned" do
+      rate_limit.update(current_delay: 300, last_success_at: 3.days.ago)
+
+      expect do
+        MXRateLimit.cleanup_abandoned
+      end.to change { MXRateLimitEvent.where(server_id: rate_limit.server_id, mx_domain: rate_limit.mx_domain).count }.from(3).to(0)
+    end
+
+    it "does not delete events for other rate limits" do
+      other_rate_limit = create(:mx_rate_limit, server: server, mx_domain: "other.com")
+      other_event = MXRateLimitEvent.create!(
+        server_id: other_rate_limit.server_id,
+        mx_domain: other_rate_limit.mx_domain,
+        event_type: "success"
+      )
+
+      rate_limit.destroy
+
+      expect(MXRateLimitEvent.exists?(other_event.id)).to be true
+    end
+
+    it "does not delete events for same mx_domain but different server" do
+      other_server = create(:server, organization: organization, name: "other-server-#{SecureRandom.hex(4)}")
+      other_rate_limit = create(:mx_rate_limit, server: other_server, mx_domain: rate_limit.mx_domain)
+      other_event = MXRateLimitEvent.create!(
+        server_id: other_rate_limit.server_id,
+        mx_domain: other_rate_limit.mx_domain,
+        event_type: "success"
+      )
+
+      rate_limit.destroy
+
+      expect(MXRateLimitEvent.exists?(other_event.id)).to be true
     end
   end
 
