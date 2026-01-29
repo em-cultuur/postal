@@ -65,6 +65,12 @@ postal:
   mx_rate_limiting_abandoned_min_hours: 48
   # Seconds to wait before logging another throttled event for the same MX domain (prevents flood of duplicate events)
   mx_rate_limiting_throttled_event_window: 300
+  # Enable automatic analysis of SMTP error responses for blacklist indicators
+  ip_reputation_smtp_analysis_enabled: true
+  # Number of soft bounces (421, 450, 451, 452) within the time window before pausing IP for that domain
+  ip_reputation_soft_bounce_threshold: 5
+  # Time window in minutes for counting soft bounces
+  ip_reputation_soft_bounce_window_minutes: 60
 
 web_server:
   # The default port the web server should listen on unless overriden by the PORT environment variable
