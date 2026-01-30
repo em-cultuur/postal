@@ -21,6 +21,7 @@ module RateLimiting
   # Default rate limit configuration
   RATE_LIMIT_CONFIG = {
     recheck: { limit: 3, window: 1.hour },
+    retry: { limit: 5, window: 1.hour },
     dns_query: { limit: 10, window: 1.minute },
     api_call: { limit: 60, window: 1.minute }
   }.freeze
@@ -33,6 +34,17 @@ module RateLimiting
       scope: [@record.id, current_user.id],
       limit: RATE_LIMIT_CONFIG[:recheck][:limit],
       window: RATE_LIMIT_CONFIG[:recheck][:window]
+    )
+  end
+
+  # Rate limit the retry action (SMTP tests are expensive)
+  # Limits: 5 requests per hour per record per user
+  def rate_limit_retry
+    rate_limit(
+      action: "retry",
+      scope: [@record.id, current_user.id],
+      limit: RATE_LIMIT_CONFIG[:retry][:limit],
+      window: RATE_LIMIT_CONFIG[:retry][:window]
     )
   end
 

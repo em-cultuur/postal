@@ -118,6 +118,61 @@ module IPBlacklist
       send_notifications(event)
     end
 
+    # Notify when retry test succeeds
+    def notify_retry_success(blacklist_record, test_result)
+      event = {
+        event_type: "blacklist_retry_success",
+        severity: "info",
+        ip_address: blacklist_record.ip_address.ipv4,
+        hostname: blacklist_record.ip_address.hostname,
+        destination_domain: blacklist_record.destination_domain,
+        blacklist_source: blacklist_record.blacklist_source,
+        retry_count: blacklist_record.retry_count,
+        test_result: test_result[:reason],
+        timestamp: Time.current.iso8601
+      }
+
+      send_notifications(event)
+    end
+
+    # Notify when retry test fails
+    def notify_retry_failed(blacklist_record, test_result)
+      event = {
+        event_type: "blacklist_retry_failed",
+        severity: "medium",
+        ip_address: blacklist_record.ip_address.ipv4,
+        hostname: blacklist_record.ip_address.hostname,
+        destination_domain: blacklist_record.destination_domain,
+        blacklist_source: blacklist_record.blacklist_source,
+        retry_count: blacklist_record.retry_count,
+        next_retry_at: blacklist_record.next_retry_at&.iso8601,
+        test_result: test_result[:reason],
+        smtp_code: test_result[:smtp_code],
+        smtp_message: test_result[:smtp_message],
+        timestamp: Time.current.iso8601
+      }
+
+      send_notifications(event)
+    end
+
+    # Notify when retry test encounters an error
+    def notify_retry_error(blacklist_record, exception)
+      event = {
+        event_type: "blacklist_retry_error",
+        severity: "medium",
+        ip_address: blacklist_record.ip_address.ipv4,
+        hostname: blacklist_record.ip_address.hostname,
+        destination_domain: blacklist_record.destination_domain,
+        blacklist_source: blacklist_record.blacklist_source,
+        retry_count: blacklist_record.retry_count,
+        next_retry_at: blacklist_record.next_retry_at&.iso8601,
+        error: exception.message,
+        timestamp: Time.current.iso8601
+      }
+
+      send_notifications(event)
+    end
+
     private
 
     def send_notifications(event)
@@ -224,6 +279,12 @@ module IPBlacklist
         text = "⚠️  IP #{event[:ip_address]} reputation warning: #{event[:metric_type]} = #{event[:metric_value]} (threshold: #{event[:threshold]})"
       when "warmup_advanced"
         text = "📈 IP #{event[:ip_address]} warmup advanced from stage #{event[:old_stage]} to #{event[:new_stage]} for domain #{event[:destination_domain]}"
+      when "blacklist_retry_success"
+        text = "✅ IP #{event[:ip_address]} retry successful! No longer blacklisted on #{event[:blacklist_source]} for #{event[:destination_domain]}"
+      when "blacklist_retry_failed"
+        text = "❌ IP #{event[:ip_address]} retry failed for #{event[:blacklist_source]} on #{event[:destination_domain]}. Next retry: #{event[:next_retry_at]}"
+      when "blacklist_retry_error"
+        text = "⚠️  IP #{event[:ip_address]} retry error for #{event[:blacklist_source]} on #{event[:destination_domain]}: #{event[:error]}"
       else
         text = "IP Health Event: #{event[:event_type]}"
       end

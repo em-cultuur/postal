@@ -12,7 +12,12 @@
 #  detected_at             :datetime         not null
 #  detection_method        :string(255)      default("dnsbl_check")
 #  last_checked_at         :datetime
+#  last_retry_at           :datetime
+#  next_retry_at           :datetime
 #  resolved_at             :datetime
+#  retry_count             :integer          default(0), not null
+#  retry_result            :string(255)
+#  retry_result_details    :text(65535)
 #  smtp_response_code      :string(255)
 #  smtp_response_message   :text(65535)
 #  status                  :string(255)      default("active"), not null
@@ -27,8 +32,10 @@
 #  index_ip_blacklist_records_on_destination_domain          (destination_domain)
 #  index_ip_blacklist_records_on_detection_method            (detection_method)
 #  index_ip_blacklist_records_on_ip_address_id               (ip_address_id)
+#  index_ip_blacklist_records_on_next_retry_at               (next_retry_at)
 #  index_ip_blacklist_records_on_smtp_rejection_event_id     (smtp_rejection_event_id)
 #  index_ip_blacklist_records_on_status_and_last_checked_at  (status,last_checked_at)
+#  index_ip_blacklist_records_on_status_and_next_retry_at    (status,next_retry_at)
 #
 # Foreign Keys
 #

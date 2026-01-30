@@ -122,6 +122,7 @@ Rails.application.routes.draw do
       post :resolve
       post :ignore
       post :recheck
+      post :retry_now
     end
   end
 

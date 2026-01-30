@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_01_28_120001) do
+ActiveRecord::Schema[7.1].define(version: 2026_01_30_100440) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -169,12 +169,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_28_120001) do
     t.string "smtp_response_code"
     t.text "smtp_response_message"
     t.integer "smtp_rejection_event_id"
+    t.datetime "next_retry_at"
+    t.datetime "last_retry_at"
+    t.integer "retry_count", default: 0, null: false
+    t.string "retry_result"
+    t.text "retry_result_details"
     t.index ["destination_domain"], name: "index_ip_blacklist_records_on_destination_domain"
     t.index ["detection_method"], name: "index_ip_blacklist_records_on_detection_method"
     t.index ["ip_address_id", "destination_domain", "blacklist_source"], name: "index_blacklist_on_ip_domain_source", unique: true
     t.index ["ip_address_id"], name: "index_ip_blacklist_records_on_ip_address_id"
+    t.index ["next_retry_at"], name: "index_ip_blacklist_records_on_next_retry_at"
     t.index ["smtp_rejection_event_id"], name: "index_ip_blacklist_records_on_smtp_rejection_event_id"
     t.index ["status", "last_checked_at"], name: "index_ip_blacklist_records_on_status_and_last_checked_at"
+    t.index ["status", "next_retry_at"], name: "index_ip_blacklist_records_on_status_and_next_retry_at"
   end
 
   create_table "ip_domain_exclusions", id: :integer, charset: "utf8mb4", collation: "utf8mb4_uca1400_ai_ci", force: :cascade do |t|
