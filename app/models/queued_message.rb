@@ -72,6 +72,7 @@ class QueuedMessage < ApplicationRecord
 
   # Reallocate a different IP address for retry attempts (e.g., after a SoftFail).
   # Tries to select a different IP from the current one if possible.
+  # Uses domain-aware selection to avoid blacklisted IPs for this destination.
   def reallocate_ip_address
     return unless Postal.ip_pools?
     return if message.nil?
@@ -79,11 +80,24 @@ class QueuedMessage < ApplicationRecord
     pool = server.ip_pool_for_message(message)
     return if pool.nil?
 
+    # Extract destination domain from the queued message
+    destination_domain = domain || extract_domain_from_message
+
+    # Try to get a different IP, preferring domain-aware selection
     available_ips = pool.ip_addresses.where.not(id: ip_address_id)
     if available_ips.exists?
-      new_ip = available_ips.select_by_priority
-    else
+      if destination_domain.present?
+        # Use domain-aware selection that respects blacklists and warmup status
+        new_ip = available_ips.select_by_priority_for_domain(destination_domain)
+      else
+        # Fallback to basic priority selection if domain cannot be determined
+        new_ip = available_ips.select_by_priority
+      end
+    elsif destination_domain.present?
       # If there's only one IP in the pool, keep the same one
+      # (but still check domain exclusions for future reference)
+      new_ip = pool.ip_addresses.select_by_priority_for_domain(destination_domain)
+    else
       new_ip = pool.ip_addresses.select_by_priority
     end
 

@@ -12,7 +12,12 @@
 #  detected_at             :datetime         not null
 #  detection_method        :string(255)      default("dnsbl_check")
 #  last_checked_at         :datetime
+#  last_retry_at           :datetime
+#  next_retry_at           :datetime
 #  resolved_at             :datetime
+#  retry_count             :integer          default(0), not null
+#  retry_result            :string(255)
+#  retry_result_details    :text(65535)
 #  smtp_response_code      :string(255)
 #  smtp_response_message   :text(65535)
 #  status                  :string(255)      default("active"), not null
@@ -27,8 +32,10 @@
 #  index_ip_blacklist_records_on_destination_domain          (destination_domain)
 #  index_ip_blacklist_records_on_detection_method            (detection_method)
 #  index_ip_blacklist_records_on_ip_address_id               (ip_address_id)
+#  index_ip_blacklist_records_on_next_retry_at               (next_retry_at)
 #  index_ip_blacklist_records_on_smtp_rejection_event_id     (smtp_rejection_event_id)
 #  index_ip_blacklist_records_on_status_and_last_checked_at  (status,last_checked_at)
+#  index_ip_blacklist_records_on_status_and_next_retry_at    (status,next_retry_at)
 #
 # Foreign Keys
 #
@@ -49,6 +56,13 @@ class IPBlacklistRecord < ApplicationRecord
   SMTP_RESPONSE = "smtp_response"
 
   DETECTION_METHODS = [DNSBL_CHECK, SMTP_RESPONSE].freeze
+
+  # Retry results
+  RETRY_SUCCESS = "success"
+  RETRY_FAILED = "failed"
+  RETRY_ERROR = "error"
+
+  RETRY_RESULTS = [RETRY_SUCCESS, RETRY_FAILED, RETRY_ERROR].freeze
 
   # Statuses
   ACTIVE = "active"
@@ -74,6 +88,10 @@ class IPBlacklistRecord < ApplicationRecord
   scope :needs_check, lambda {
     where(status: ACTIVE)
       .where("last_checked_at IS NULL OR last_checked_at < ?", 1.hour.ago)
+  }
+  scope :needs_retry, lambda {
+    where(status: ACTIVE, detection_method: SMTP_RESPONSE)
+      .where("next_retry_at IS NOT NULL AND next_retry_at <= ?", Time.current)
   }
   scope :recent, -> { order(detected_at: :desc) }
 
@@ -114,6 +132,22 @@ class IPBlacklistRecord < ApplicationRecord
 
   def detected_via_dnsbl?
     detection_method == DNSBL_CHECK
+  end
+
+  # Schedule next retry (2 days from now)
+  def schedule_retry!
+    update!(next_retry_at: 2.days.from_now)
+    Rails.logger.info "[BLACKLIST RETRY] Scheduled retry for IP #{ip_address.ipv4} on #{destination_domain} at #{next_retry_at}"
+  end
+
+  # Check if retry is needed
+  def needs_retry?
+    active? && detected_via_smtp? && next_retry_at.present? && next_retry_at <= Time.current
+  end
+
+  # Check if retry can be scheduled
+  def can_schedule_retry?
+    active? && detected_via_smtp?
   end
 
   private

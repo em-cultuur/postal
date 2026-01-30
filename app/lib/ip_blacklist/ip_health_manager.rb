@@ -204,6 +204,9 @@ module IPBlacklist
 
           Rails.logger.warn "[SMTP REJECTION] Created blacklist record for IP #{ip_address.ipv4} - source: #{parsed_response[:blacklist_source]}"
 
+          # Schedule automatic retry for SMTP-detected blacklists (2 days from now)
+          blacklist_record.schedule_retry!
+
           # Handle the blacklist using existing logic
           handle_blacklist_detected(blacklist_record)
         else

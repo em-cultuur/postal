@@ -9,8 +9,9 @@ class IPBlacklistRecordsController < ApplicationController
   include RateLimiting
 
   before_action :admin_required
-  before_action :load_record, only: [:show, :resolve, :ignore, :recheck]
+  before_action :load_record, only: [:show, :resolve, :ignore, :recheck, :retry_now]
   before_action :rate_limit_recheck, only: [:recheck]
+  before_action :rate_limit_retry, only: [:retry_now]
 
   # GET /ip_blacklist_records
   # List all blacklist records with filtering
@@ -156,6 +157,82 @@ class IPBlacklistRecordsController < ApplicationController
     respond_to do |format|
       format.html { redirect_back fallback_location: ip_blacklist_record_path(@record), alert: error_message }
       format.json { render json: { error: error_message, error_id: error_id }, status: :unprocessable_content }
+    end
+  end
+
+  # POST /ip_blacklist_records/:id/retry_now
+  # Manually trigger an immediate retry test for SMTP-detected blacklists
+  def retry_now
+    # Verify this is an SMTP-detected blacklist
+    unless @record.detected_via_smtp?
+      message = "Retry is only available for SMTP-detected blacklists"
+      return respond_to do |format|
+        format.html { redirect_back fallback_location: ip_blacklist_record_path(@record), alert: message }
+        format.json { render json: { error: message }, status: :unprocessable_content }
+      end
+    end
+
+    # Verify record is still active
+    unless @record.active?
+      message = "Cannot retry: blacklist record is already #{@record.status}"
+      return respond_to do |format|
+        format.html { redirect_back fallback_location: ip_blacklist_record_path(@record), alert: message }
+        format.json { render json: { error: message }, status: :unprocessable_content }
+      end
+    end
+
+    # Log manual retry trigger
+    Rails.logger.info "[BLACKLIST RETRY] Manual retry triggered by #{current_user.name} for record #{@record.id} (IP #{@record.ip_address.ipv4}, domain #{@record.destination_domain})"
+
+    # Perform retry
+    begin
+      retry_service = IPBlacklist::RetryService.new(@record)
+      result = retry_service.perform_retry
+
+      case result
+      when :success
+        message = "✓ Retry successful! IP #{@record.ip_address.ipv4} is no longer blacklisted for #{@record.destination_domain}. Warmup process started."
+        notice_type = :notice
+      when :failed
+        message = "✗ Retry failed: IP #{@record.ip_address.ipv4} is still blacklisted for #{@record.destination_domain}. Next automatic retry scheduled for #{@record.next_retry_at&.strftime('%Y-%m-%d %H:%M')}. Reason: #{retry_service.error_message}"
+        notice_type = :alert
+      when :error
+        message = "✗ Retry error: #{retry_service.error_message}. Next automatic retry scheduled for #{@record.next_retry_at&.strftime('%Y-%m-%d %H:%M')}."
+        notice_type = :alert
+      end
+
+      respond_to do |format|
+        format.html { redirect_back fallback_location: ip_blacklist_record_path(@record), notice_type => message }
+        format.json do
+          render json: {
+            success: result == :success,
+            result: result,
+            message: message,
+            next_retry_at: @record.next_retry_at,
+            record: {
+              id: @record.id,
+              status: @record.reload.status,
+              retry_count: @record.retry_count,
+              retry_result: @record.retry_result,
+              last_retry_at: @record.last_retry_at
+            }
+          }
+        end
+      end
+    rescue StandardError => e
+      # Log detailed error
+      error_id = SecureRandom.uuid
+      Rails.logger.error "[BLACKLIST RETRY] Error ID: #{error_id}"
+      Rails.logger.error "[BLACKLIST RETRY] Record ID: #{@record.id}, User: #{current_user.name}"
+      Rails.logger.error "[BLACKLIST RETRY] #{e.class}: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+
+      error_message = "Retry failed due to an error. Please try again later. (Error ID: #{error_id})"
+
+      respond_to do |format|
+        format.html { redirect_back fallback_location: ip_blacklist_record_path(@record), alert: error_message }
+        format.json { render json: { error: error_message, error_id: error_id }, status: :internal_server_error }
+      end
     end
   end
 

@@ -93,8 +93,18 @@ class IPReputationController < ApplicationController
 
   def count_healthy_ips
     total = IPAddress.count
-    problematic = IPDomainExclusion.select(:ip_address_id).distinct.count +
-                  IPBlacklistRecord.active.select(:ip_address_id).distinct.count
+
+    # Use UNION to get distinct IPs that have either blacklist records OR domain exclusions
+    # This avoids double-counting IPs that have both
+    blacklisted_ids = IPBlacklistRecord.active.select(:ip_address_id)
+    excluded_ids = IPDomainExclusion.select(:ip_address_id)
+
+    problematic = IPAddress
+                  .where(id: blacklisted_ids)
+                  .or(IPAddress.where(id: excluded_ids))
+                  .distinct
+                  .count
+
     [total - problematic, 0].max
   end
 

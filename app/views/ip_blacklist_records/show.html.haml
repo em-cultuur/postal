@@ -24,6 +24,13 @@
         %th Destination Domain
         %td= @record.destination_domain || "All domains (general blacklisting)"
       %tr
+        %th Detection Method
+        %td
+          - if @record.detected_via_smtp?
+            %span.label.label--blue SMTP Response
+          - else
+            %span.label.label--purple DNSBL Check
+      %tr
         %th Detected At
         %td
           = @record.detected_at.strftime("%Y-%m-%d %H:%M:%S")
@@ -60,6 +67,44 @@
       %tr
         %th Updated At
         %td= @record.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+
+  - if @record.detected_via_smtp? && @record.active?
+    %h2.sectionTitle Retry Information
+
+    %table.dataTable.u-margin
+      %tbody
+        %tr
+          %th{:width => "30%"} Retry Count
+          %td= @record.retry_count
+        - if @record.last_retry_at
+          %tr
+            %th Last Retry At
+            %td
+              = @record.last_retry_at.strftime("%Y-%m-%d %H:%M:%S")
+              %br
+              %small= "(#{time_ago_in_words(@record.last_retry_at)} ago)"
+        - if @record.retry_result
+          %tr
+            %th Last Retry Result
+            %td
+              - if @record.retry_result == "success"
+                %span.label.label--green Success
+              - elsif @record.retry_result == "failed"
+                %span.label.label--red Failed
+              - else
+                %span.label.label--orange Error
+        - if @record.next_retry_at
+          %tr
+            %th Next Automatic Retry
+            %td
+              = @record.next_retry_at.strftime("%Y-%m-%d %H:%M:%S")
+              %br
+              %small= "(in #{time_ago_in_words(@record.next_retry_at, include_seconds: false)})"
+        - else
+          %tr
+            %th Next Automatic Retry
+            %td
+              %em Not scheduled
 
   - triggered_actions = @record.ip_health_actions.order(created_at: :desc).limit(5)
   - if triggered_actions.any?
@@ -99,6 +144,8 @@
 
     .buttonSet.u-margin
       = link_to "Recheck Delisting", recheck_ip_blacklist_record_path(@record), :method => :post, :class => "button button--primary", :data => {:confirm => "Verify if this IP is still listed?"}
+      - if @record.detected_via_smtp?
+        = link_to "Retry Now", retry_now_ip_blacklist_record_path(@record), :method => :post, :class => "button button--info", :data => {:confirm => "Send a test email to verify if the IP is still blacklisted?"}
   - else
     %p.u-margin
       This blacklist record is currently active. You can mark it as resolved if you've
@@ -108,6 +155,9 @@
       = link_to "Mark as Resolved", resolve_ip_blacklist_record_path(@record), :method => :post, :class => "button button--positive", :data => {:confirm => "Mark this record as resolved? This will start warmup recovery."}
       = link_to "Mark as Ignored", ignore_ip_blacklist_record_path(@record), :method => :post, :class => "button button--grey", :data => {:confirm => "Mark as false positive? This will prevent automatic actions."}
       = link_to "Recheck Delisting", recheck_ip_blacklist_record_path(@record), :method => :post, :class => "button", :data => {:confirm => "Verify current blacklist status?"}
+      - if @record.detected_via_smtp?
+        = link_to "Retry Now", retry_now_ip_blacklist_record_path(@record), :method => :post, :class => "button button--info", :data => {:confirm => "Send a test email to verify if the IP is still blacklisted?"}
+
 
   .buttonSet.u-margin
     = link_to "Back to Records", ip_blacklist_records_path, :class => "button"

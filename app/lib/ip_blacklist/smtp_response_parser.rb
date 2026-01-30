@@ -6,6 +6,7 @@ module IPBlacklist
   # - Gmail: reputation-based throttling and blocking
   # - Outlook/Hotmail: IP blocking and reputation issues
   # - Yahoo: spam filtering and IP blocking
+  # - iCloud/Apple: policy-based blocking and reputation issues
   # - Generic DNSBL patterns: Spamhaus, Barracuda, SORBS, SpamCop, etc.
   #
   # @example Parse an SMTP error message
@@ -136,6 +137,28 @@ module IPBlacklist
       },
     ].freeze
 
+    # iCloud/Apple-specific patterns (optimized for ReDoS protection)
+    ICLOUD_PATTERNS = [
+      {
+        regex: /\A.{0,200}554[- ]5\.7\.1.{0,50}\[HM\d+\].{0,50}Message rejected due to local policy/i,
+        source: "icloud_policy_rejection",
+        severity: "high",
+        description: "iCloud policy-based rejection - IP reputation or spam filtering issue"
+      },
+      {
+        regex: /\A.{0,200}554[- ]5\.7\.1.{0,100}support\.apple\.com.{0,50}HT204137/i,
+        source: "icloud_policy_rejection",
+        severity: "high",
+        description: "iCloud policy-based rejection - IP reputation or spam filtering issue"
+      },
+      {
+        regex: /\A.{0,200}421[- ]4\.7\.0.{0,50}\[HM\d+\].{0,50}temporarily deferred/i,
+        source: "icloud_temporary_block",
+        severity: "medium",
+        description: "iCloud temporary deferral - possible reputation issue"
+      },
+    ].freeze
+
     # Parse SMTP response message and code
     #
     # @param message [String] The SMTP error message
@@ -170,8 +193,10 @@ module IPBlacklist
       begin
         Timeout.timeout(PARSE_TIMEOUT) do
           # Check for provider-specific patterns first (most specific)
+          # iCloud patterns checked before Gmail to avoid conflicts with generic patterns
           # then generic DNSBL patterns (fallback)
-          check_gmail_patterns(safe_message, result) ||
+          check_icloud_patterns(safe_message, result) ||
+            check_gmail_patterns(safe_message, result) ||
             check_outlook_patterns(safe_message, result) ||
             check_yahoo_patterns(safe_message, result) ||
             check_generic_dnsbl_patterns(safe_message, result)
@@ -256,6 +281,20 @@ module IPBlacklist
     # @private
     def self.check_yahoo_patterns(message, result)
       YAHOO_PATTERNS.each do |pattern|
+        next unless message =~ pattern[:regex]
+
+        result[:blacklist_detected] = true
+        result[:blacklist_source] = pattern[:source]
+        result[:severity] = pattern[:severity]
+        result[:description] = pattern[:description]
+        return true
+      end
+      false
+    end
+
+    # @private
+    def self.check_icloud_patterns(message, result)
+      ICLOUD_PATTERNS.each do |pattern|
         next unless message =~ pattern[:regex]
 
         result[:blacklist_detected] = true

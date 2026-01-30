@@ -12,7 +12,12 @@
 #  detected_at             :datetime         not null
 #  detection_method        :string(255)      default("dnsbl_check")
 #  last_checked_at         :datetime
+#  last_retry_at           :datetime
+#  next_retry_at           :datetime
 #  resolved_at             :datetime
+#  retry_count             :integer          default(0), not null
+#  retry_result            :string(255)
+#  retry_result_details    :text(65535)
 #  smtp_response_code      :string(255)
 #  smtp_response_message   :text(65535)
 #  status                  :string(255)      default("active"), not null
@@ -27,8 +32,10 @@
 #  index_ip_blacklist_records_on_destination_domain          (destination_domain)
 #  index_ip_blacklist_records_on_detection_method            (detection_method)
 #  index_ip_blacklist_records_on_ip_address_id               (ip_address_id)
+#  index_ip_blacklist_records_on_next_retry_at               (next_retry_at)
 #  index_ip_blacklist_records_on_smtp_rejection_event_id     (smtp_rejection_event_id)
 #  index_ip_blacklist_records_on_status_and_last_checked_at  (status,last_checked_at)
+#  index_ip_blacklist_records_on_status_and_next_retry_at    (status,next_retry_at)
 #
 # Foreign Keys
 #
@@ -120,6 +127,87 @@ RSpec.describe IPBlacklistRecord, type: :model do
       expect(record.active?).to be true
       expect(record.resolved?).to be false
       expect(record.ignored?).to be false
+    end
+  end
+
+  describe "retry functionality" do
+    describe "#schedule_retry!" do
+      let(:record) { create(:ip_blacklist_record, status: "active", detection_method: "smtp_response") }
+
+      it "sets next_retry_at to 2 days from now" do
+        Timecop.freeze do
+          record.schedule_retry!
+          expect(record.next_retry_at).to be_within(1.second).of(2.days.from_now)
+        end
+      end
+    end
+
+    describe "#needs_retry?" do
+      it "returns true for active SMTP-detected records with next_retry_at in past" do
+        record = create(:ip_blacklist_record,
+                        status: "active",
+                        detection_method: "smtp_response",
+                        next_retry_at: 1.hour.ago)
+        expect(record.needs_retry?).to be true
+      end
+
+      it "returns false for resolved records" do
+        record = create(:ip_blacklist_record,
+                        status: "resolved",
+                        detection_method: "smtp_response",
+                        next_retry_at: 1.hour.ago)
+        expect(record.needs_retry?).to be false
+      end
+
+      it "returns false for DNSBL-detected records" do
+        record = create(:ip_blacklist_record,
+                        status: "active",
+                        detection_method: "dnsbl_check",
+                        next_retry_at: 1.hour.ago)
+        expect(record.needs_retry?).to be false
+      end
+
+      it "returns false when next_retry_at is in future" do
+        record = create(:ip_blacklist_record,
+                        status: "active",
+                        detection_method: "smtp_response",
+                        next_retry_at: 1.hour.from_now)
+        expect(record.needs_retry?).to be false
+      end
+    end
+
+    describe ".needs_retry scope" do
+      let(:ip_address) { create(:ip_address) }
+      let!(:ready_for_retry) do
+        create(:ip_blacklist_record,
+               ip_address: ip_address,
+               status: "active",
+               detection_method: "smtp_response",
+               next_retry_at: 1.hour.ago,
+               destination_domain: "gmail.com")
+      end
+      let!(:not_yet_ready) do
+        create(:ip_blacklist_record,
+               ip_address: ip_address,
+               status: "active",
+               detection_method: "smtp_response",
+               next_retry_at: 1.hour.from_now,
+               destination_domain: "yahoo.com")
+      end
+      let!(:resolved_record) do
+        create(:ip_blacklist_record,
+               ip_address: ip_address,
+               status: "resolved",
+               detection_method: "smtp_response",
+               next_retry_at: 1.hour.ago,
+               destination_domain: "outlook.com")
+      end
+
+      it "returns only records ready for retry" do
+        expect(IPBlacklistRecord.needs_retry).to include(ready_for_retry)
+        expect(IPBlacklistRecord.needs_retry).not_to include(not_yet_ready)
+        expect(IPBlacklistRecord.needs_retry).not_to include(resolved_record)
+      end
     end
   end
 end
