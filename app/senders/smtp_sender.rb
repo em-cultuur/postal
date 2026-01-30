@@ -126,12 +126,22 @@ class SMTPSender < BaseSender
 
     # Parse SMTP response for blacklist detection (hard bounce)
     logger.info "About to call handle_smtp_error_response (hard bounce)"
-    handle_smtp_error_response(e, soft_bounce: false)
-    logger.info "Finished handle_smtp_error_response (hard bounce)"
+    blacklist_detected = handle_smtp_error_response(e, soft_bounce: false)
+    logger.info "Finished handle_smtp_error_response (hard bounce) - blacklist_detected: #{blacklist_detected}"
 
-    create_result("HardFail", start_time) do |r|
-      r.details = "Permanent SMTP delivery error when sending to #{@current_endpoint}"
-      r.output = e.message
+    # If blacklist detected, convert to SoftFail to allow retry with different IP
+    if blacklist_detected
+      logger.warn "Blacklist detected - converting HardFail to SoftFail for retry with different IP"
+      create_result("SoftFail", start_time) do |r|
+        r.details = "IP blacklist detected when sending to #{@current_endpoint} - will retry with different IP"
+        r.output = e.message
+        r.retry = true
+      end
+    else
+      create_result("HardFail", start_time) do |r|
+        r.details = "Permanent SMTP delivery error when sending to #{@current_endpoint}"
+        r.output = e.message
+      end
     end
   rescue StandardError => e
     logger.error "#{e.class}: #{e.message}"
@@ -257,10 +267,11 @@ class SMTPSender < BaseSender
   #
   # @param exception [Exception] The SMTP exception
   # @param soft_bounce [Boolean] Whether this is a soft bounce
+  # @return [Boolean] True if blacklist was detected, false otherwise
   #
   def handle_smtp_error_response(exception, soft_bounce:)
     unless smtp_response_analysis_enabled?
-      return
+      return false
     end
 
     # Try to get source IP address
@@ -273,18 +284,18 @@ class SMTPSender < BaseSender
         source_ip = find_ip_address_by_ip(extracted_ip)
         unless source_ip
           logger.debug "[SMTP BLACKLIST] Extracted IP #{extracted_ip} not found in database"
-          return
+          return false
         end
       else
         logger.debug "[SMTP BLACKLIST] Could not extract IP from error message"
-        return
+        return false
       end
     end
 
     # Extract SMTP code from exception message
     smtp_code = extract_smtp_code(exception.message)
     unless smtp_code
-      return
+      return false
     end
 
     # Parse the SMTP response
@@ -293,11 +304,15 @@ class SMTPSender < BaseSender
     # Handle based on blacklist detection and bounce type
     if parsed[:blacklist_detected]
       handle_blacklist_detected_in_smtp(parsed, smtp_code, exception.message, soft_bounce, source_ip)
+      return true
     end
+
+    false
   rescue StandardError => e
     # Don't let SMTP analysis errors break the main flow
     logger.error "[SMTP ANALYSIS ERROR] #{e.class}: #{e.message}"
     logger.error e.backtrace.join("\n")
+    false
   end
 
   # Handle blacklist detection from SMTP response

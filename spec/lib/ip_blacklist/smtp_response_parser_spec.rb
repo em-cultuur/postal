@@ -133,7 +133,8 @@ RSpec.describe IPBlacklist::SMTPResponseParser do
       end
 
       it "detects Outlook DNSBL block" do
-        message = "550 SC-001 (BAY004) Unfortunately, messages from [192.0.2.1] weren't sent. Please contact your Internet service provider since part of their network is on our block list (S3140). DNSBL issue."
+        message = "550 SC-001 (BAY004) Unfortunately, messages from [192.0.2.1] weren't sent. " \
+                  "Please contact your Internet service provider since part of their network is on our block list (S3140). DNSBL issue."
         result = described_class.parse(message, "550")
 
         expect(result[:blacklist_detected]).to be true
@@ -180,6 +181,39 @@ RSpec.describe IPBlacklist::SMTPResponseParser do
         expect(result[:blacklist_detected]).to be true
         expect(result[:blacklist_source]).to eq("yahoo_spam_block")
         expect(result[:severity]).to eq("high")
+      end
+    end
+
+    context "iCloud/Apple patterns" do
+      it "detects iCloud policy rejection with HM code" do
+        message = "554 5.7.1 [HM08] Message rejected due to local policy. Please visit https://support.apple.com/en-us/HT204137"
+        result = described_class.parse(message, "554")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("icloud_policy_rejection")
+        expect(result[:severity]).to eq("high")
+        expect(result[:bounce_type]).to eq("hard")
+        expect(result[:suggested_action]).to eq("pause_immediately")
+      end
+
+      it "detects iCloud policy rejection with support URL" do
+        message = "554 5.7.1 Message rejected. See support.apple.com/en-us/HT204137 for more information."
+        result = described_class.parse(message, "554")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("icloud_policy_rejection")
+        expect(result[:severity]).to eq("high")
+      end
+
+      it "detects iCloud temporary block" do
+        message = "421 4.7.0 [HM15] Message temporarily deferred. Try again later."
+        result = described_class.parse(message, "421")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("icloud_temporary_block")
+        expect(result[:severity]).to eq("medium")
+        expect(result[:bounce_type]).to eq("soft")
+        expect(result[:suggested_action]).to eq("monitor_closely")
       end
     end
 
