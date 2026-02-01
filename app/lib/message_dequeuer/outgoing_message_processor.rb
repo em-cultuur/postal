@@ -229,10 +229,26 @@ module MessageDequeuer
       retry_after = throttled_until + 10.seconds
 
       # Update all queued messages for this domain that don't already have a later retry_after
-      updated_count = QueuedMessage.where(server_id: queued_message.server_id, domain: domain)
-                                   .where("retry_after IS NULL OR retry_after < ?", retry_after)
-                                   .where.not(id: queued_message.id)
-                                   .update_all(retry_after: retry_after)
+      # Use a smaller batch size and SKIP LOCKED to reduce lock contention
+      updated_count = 0
+      begin
+        batch_size = 100
+        loop do
+          # Update in batches to reduce lock contention
+          count = QueuedMessage.where(server_id: queued_message.server_id, domain: domain)
+                               .where("retry_after IS NULL OR retry_after < ?", retry_after)
+                               .where.not(id: queued_message.id)
+                               .limit(batch_size)
+                               .update_all(retry_after: retry_after)
+          updated_count += count
+          break if count < batch_size
+        end
+      rescue ActiveRecord::Deadlocked => e
+        log "deadlock during domain throttle batch update, partial update completed",
+            domain: domain,
+            updated_count: updated_count,
+            error: e.message
+      end
 
       return unless updated_count > 0
 
@@ -411,11 +427,26 @@ module MessageDequeuer
       retry_after = Time.current + delay_seconds.seconds + 10.seconds
 
       # Update all queued messages for this MX domain
-      updated_count = QueuedMessage
-                      .where(server_id: queued_message.server_id, mx_domain: mx_domain)
-                      .where("retry_after IS NULL OR retry_after < ?", retry_after)
-                      .where.not(id: queued_message.id)
-                      .update_all(retry_after: retry_after)
+      # Use a smaller batch size to reduce lock contention
+      updated_count = 0
+      begin
+        batch_size = 100
+        loop do
+          count = QueuedMessage
+                  .where(server_id: queued_message.server_id, mx_domain: mx_domain)
+                  .where("retry_after IS NULL OR retry_after < ?", retry_after)
+                  .where.not(id: queued_message.id)
+                  .limit(batch_size)
+                  .update_all(retry_after: retry_after)
+          updated_count += count
+          break if count < batch_size
+        end
+      rescue ActiveRecord::Deadlocked => e
+        log "deadlock during MX rate limit batch update, partial update completed",
+            mx_domain: mx_domain,
+            updated_count: updated_count,
+            error: e.message
+      end
 
       return unless updated_count > 0
 

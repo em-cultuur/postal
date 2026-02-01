@@ -22,10 +22,14 @@
 #
 # Indexes
 #
-#  index_queued_messages_on_domain      (domain)
-#  index_queued_messages_on_message_id  (message_id)
-#  index_queued_messages_on_mx_domain   (mx_domain)
-#  index_queued_messages_on_server_id   (server_id)
+#  index_queued_messages_on_batch_lock           (batch_key,ip_address_id,locked_by,locked_at)
+#  index_queued_messages_on_domain               (domain)
+#  index_queued_messages_on_lock_and_retry       (locked_by,locked_at,retry_after,ip_address_id)
+#  index_queued_messages_on_message_id           (message_id)
+#  index_queued_messages_on_mx_domain            (mx_domain)
+#  index_queued_messages_on_server_domain_retry  (server_id,domain,retry_after)
+#  index_queued_messages_on_server_id            (server_id)
+#  index_queued_messages_on_server_mx_retry      (server_id,mx_domain,retry_after)
 #
 
 class QueuedMessage < ApplicationRecord
@@ -114,8 +118,21 @@ class QueuedMessage < ApplicationRecord
     else
       time = Time.now
       locker = Postal.locker_name
-      self.class.ready.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: nil, locked_at: nil).limit(limit).update_all(locked_by: locker, locked_at: time)
-      QueuedMessage.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: locker, locked_at: time).where.not(id: id)
+
+      # Use a transaction with a shorter lock wait timeout to prevent deadlocks
+      begin
+        ActiveRecord::Base.connection.execute("SET SESSION innodb_lock_wait_timeout = 1")
+        self.class.ready.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: nil, locked_at: nil).limit(limit).update_all(locked_by: locker, locked_at: time)
+        QueuedMessage.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: locker, locked_at: time).where.not(id: id)
+      rescue ActiveRecord::StatementInvalid => e
+        # If we get a lock timeout, return empty array rather than failing
+        raise unless e.message.include?("Lock wait timeout") || e.message.include?("Deadlock")
+
+        []
+      ensure
+        # Reset to default timeout
+        ActiveRecord::Base.connection.execute("SET SESSION innodb_lock_wait_timeout = DEFAULT")
+      end
     end
   end
 

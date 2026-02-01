@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_01_30_100440) do
+ActiveRecord::Schema[7.1].define(version: 2026_02_03_100000) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -396,9 +396,13 @@ ActiveRecord::Schema[7.1].define(version: 2026_01_30_100440) do
     t.boolean "manual", default: false
     t.string "batch_key"
     t.string "mx_domain"
+    t.index ["batch_key", "ip_address_id", "locked_by", "locked_at"], name: "index_queued_messages_on_batch_lock"
     t.index ["domain"], name: "index_queued_messages_on_domain", length: 8
+    t.index ["locked_by", "locked_at", "retry_after", "ip_address_id"], name: "index_queued_messages_on_lock_and_retry"
     t.index ["message_id"], name: "index_queued_messages_on_message_id"
     t.index ["mx_domain"], name: "index_queued_messages_on_mx_domain"
+    t.index ["server_id", "domain", "retry_after"], name: "index_queued_messages_on_server_domain_retry"
+    t.index ["server_id", "mx_domain", "retry_after"], name: "index_queued_messages_on_server_mx_retry"
     t.index ["server_id"], name: "index_queued_messages_on_server_id"
   end
 
