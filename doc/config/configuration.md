@@ -66,6 +66,17 @@ For detailed configuration options and examples, see:
 - `doc/MX_RATE_LIMITING_CONFIGURATION.md` - Complete MX rate limiting configuration guide
 - `doc/MX_RATE_LIMITING_SPECIFICATION.md` - Technical specification and algorithm details
 
+## SMTP Authentication Failure Blocking
+
+Postal includes built-in protection against brute force attacks on SMTP authentication. The system automatically blocks IP addresses after a configurable number of failed authentication attempts.
+
+For detailed information, see:
+- `doc/SMTP_AUTH_BLOCKING.md` - Complete SMTP authentication blocking guide
+
+Key configuration options:
+- `smtp_server.auth_failure_threshold` - Number of failures before blocking (default: 5)
+- `smtp_server.auth_failure_block_duration` - Block duration in minutes (default: 120)
+
 ## Legacy configuration
 
 Legacy configuration files from Postal v1 and v2 are still supported. If you wish to use a new configuration option that is not available in the legacy format, you will need to upgrade the file to version 2.

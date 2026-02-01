@@ -1,0 +1,112 @@
+- page_title << "Blocked IPs"
+
+.pageHeader
+  %h1.pageHeader__title SMTP Blocked IP Addresses
+  %p.pageHeader__intro IP addresses blocked due to failed authentication attempts
+
+.pageContent
+  .pageActions
+    = form_tag admin_blocked_ips_path, method: :get, class: "searchForm" do
+      .searchForm__field
+        = text_field_tag :query, @query, placeholder: "Search IP address...", class: "searchForm__input"
+        = submit_tag "Search", class: "button button--primary"
+        - if @query.present?
+          = link_to "Clear", admin_blocked_ips_path, class: "button button--secondary"
+
+    .pageActions__buttons
+      - if @total_blocked > 0
+        = link_to "Cleanup Expired", cleanup_admin_blocked_ips_path, method: :post, class: "button button--secondary", data: { confirm: "This will remove expired entries from the index. Continue?" }
+        = link_to "Unblock All", unblock_all_admin_blocked_ips_path, method: :post, class: "button button--danger", data: { confirm: "Are you sure you want to unblock all #{@total_blocked} IP addresses?" }
+
+  - if @total_blocked.zero?
+    .noData
+      %p.noData__title
+        - if @query.present?
+          No blocked IPs found matching "#{@query}"
+        - else
+          No blocked IP addresses
+      %p.noData__text
+        - if @query.present?
+          Try a different search query or
+          = link_to "view all blocked IPs", admin_blocked_ips_path
+        - else
+          IP addresses will appear here after exceeding the authentication failure threshold.
+
+  - else
+    .statsBar
+      .statsBar__item
+        .statsBar__value= number_with_delimiter @total_blocked
+        .statsBar__label Total Blocked IPs
+
+    %table.dataTable
+      %thead
+        %tr
+          %th.dataTable__header IP Address
+          %th.dataTable__header.u-center Blocked At
+          %th.dataTable__header.u-center Failed Attempts
+          %th.dataTable__header.u-center Threshold
+          %th.dataTable__header.u-center Expires At
+          %th.dataTable__header.u-center Time Remaining
+          %th.dataTable__header.u-center Actions
+      %tbody
+        - @blocked_ips.each do |ip_info|
+          %tr.dataTable__row
+            %td.dataTable__cell
+              %code.ipAddress= ip_info[:ip_address]
+            %td.dataTable__cell.u-center
+              %span.timestamp{title: ip_info[:blocked_at].iso8601}
+                = time_ago_in_words(ip_info[:blocked_at])
+                ago
+            %td.dataTable__cell.u-center
+              %span.badge.badge--danger= ip_info[:failure_count]
+            %td.dataTable__cell.u-center
+              = ip_info[:threshold]
+            %td.dataTable__cell.u-center
+              %span.timestamp{title: ip_info[:expires_at].iso8601}
+                = ip_info[:expires_at].strftime("%Y-%m-%d %H:%M:%S")
+            %td.dataTable__cell.u-center
+              - if ip_info[:time_remaining] > 0
+                %span.timeRemaining= distance_of_time_in_words(ip_info[:time_remaining])
+              - else
+                %span.expired Expired
+            %td.dataTable__cell.u-center
+              = link_to "Unblock", unblock_admin_blocked_ips_path(ip: ip_info[:ip_address]), method: :post, class: "button button--small button--primary", data: { confirm: "Are you sure you want to unblock #{ip_info[:ip_address]}?" }
+
+    - if @total_pages > 1
+      .pagination
+        .pagination__info
+          Showing
+          = (@page - 1) * @per_page + 1
+          to
+          = [(@page * @per_page), @total_blocked].min
+          of
+          = number_with_delimiter @total_blocked
+          blocked IPs
+
+        .pagination__controls
+          - if @page > 1
+            = link_to "← Previous", admin_blocked_ips_path(page: @page - 1, query: @query), class: "pagination__link"
+          - else
+            %span.pagination__link.pagination__link--disabled ← Previous
+
+          %span.pagination__current
+            Page #{@page} of #{@total_pages}
+
+          - if @page < @total_pages
+            = link_to "Next →", admin_blocked_ips_path(page: @page + 1, query: @query), class: "pagination__link"
+          - else
+            %span.pagination__link.pagination__link--disabled Next →
+
+  .pageFooter
+    %p.pageFooter__info
+      %strong Configuration:
+      Threshold =
+      = SMTPServer::AuthFailureTracker::DEFAULT_THRESHOLD
+      failures,
+      Block Duration =
+      = SMTPServer::AuthFailureTracker::DEFAULT_BLOCK_DURATION_MINUTES
+      minutes
+    %p.pageFooter__links
+      = link_to "Documentation", "https://github.com/postalserver/postal/blob/main/doc/SMTP_AUTH_BLOCKING.md", target: "_blank", rel: "noopener"
+      |
+      = link_to "Admin Dashboard", admin_dashboard_path

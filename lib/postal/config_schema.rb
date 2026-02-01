@@ -415,6 +415,16 @@ module Postal
       string :log_ip_address_exclusion_matcher do
         description "A regular expression to use to exclude connections from logging"
       end
+
+      integer :auth_failure_threshold do
+        description "Number of failed authentication attempts before blocking an IP address"
+        default 5
+      end
+
+      integer :auth_failure_block_duration do
+        description "Duration in minutes to block an IP address after exceeding the authentication failure threshold"
+        default 120
+      end
     end
 
     group :dns do

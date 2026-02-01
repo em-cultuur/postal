@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "auth_failure_tracker"
+
 module SMTPServer
   class Client
 
@@ -113,6 +115,12 @@ module SMTPServer
       @logger ||= Postal.logger.create_tagged_logger(trace_id: trace_id)
     end
 
+    def auth_failure_tracker
+      return nil unless @ip_address
+
+      @auth_failure_tracker ||= AuthFailureTracker.new(ip_address: @ip_address)
+    end
+
     private
 
     def proxy(data)
@@ -182,6 +190,13 @@ module SMTPServer
     def auth_plain(data)
       increment_command_count("AUTH PLAIN")
 
+      # Check if IP is blocked before processing authentication
+      if auth_failure_tracker&.blocked?
+        increment_error_count("ip-blocked")
+        logger&.warn "Authentication blocked for #{@ip_address} - too many failed attempts"
+        return "421 Too many authentication failures. Try again later."
+      end
+
       handler = proc do |idata|
         @proc = nil
         idata = Base64.decode64(idata)
@@ -209,6 +224,13 @@ module SMTPServer
     def auth_login(data)
       increment_command_count("AUTH LOGIN")
 
+      # Check if IP is blocked before processing authentication
+      if auth_failure_tracker&.blocked?
+        increment_error_count("ip-blocked")
+        logger&.warn "Authentication blocked for #{@ip_address} - too many failed attempts"
+        return "421 Too many authentication failures. Try again later."
+      end
+
       password_handler = proc do |idata|
         @proc = nil
         password = Base64.decode64(idata)
@@ -233,16 +255,32 @@ module SMTPServer
     def authenticate(password)
       if @credential = Credential.where(type: "SMTP", key: password).first
         @credential.use
+        # Reset failure counter on successful authentication
+        auth_failure_tracker&.record_success
         "235 Granted for #{@credential.server.organization.permalink}/#{@credential.server.permalink}"
       else
         logger&.warn "Authentication failure for #{@ip_address}"
         increment_error_count("invalid-credentials")
+
+        # Track the failed attempt and check if we should block
+        if auth_failure_tracker&.record_failure_and_check_threshold
+          increment_prometheus_counter(:postal_smtp_server_auth_blocks_total)
+          logger&.warn "IP #{@ip_address} blocked after #{auth_failure_tracker.threshold} failed authentication attempts"
+        end
+
         "535 Invalid credential"
       end
     end
 
     def auth_cram_md5(data)
       increment_command_count("AUTH CRAM-MD5")
+
+      # Check if IP is blocked before processing authentication
+      if auth_failure_tracker&.blocked?
+        increment_error_count("ip-blocked")
+        logger&.warn "Authentication blocked for #{@ip_address} - too many failed attempts"
+        return "421 Too many authentication failures. Try again later."
+      end
 
       challenge = Digest::SHA1.hexdigest(Time.now.to_i.to_s + rand(100_000).to_s)
       challenge = "<#{challenge[0, 20]}@#{Postal::Config.postal.smtp_hostname}>"
@@ -255,6 +293,13 @@ module SMTPServer
         if server.nil?
           logger&.warn "Authentication failure for #{@ip_address} (no server found matching #{username})"
           increment_error_count("invalid-credentials")
+
+          # Track the failed attempt
+          if auth_failure_tracker&.record_failure_and_check_threshold
+            increment_prometheus_counter(:postal_smtp_server_auth_blocks_total)
+            logger&.warn "IP #{@ip_address} blocked after #{auth_failure_tracker.threshold} failed authentication attempts"
+          end
+
           next "535 Denied"
         end
 
@@ -273,7 +318,17 @@ module SMTPServer
         if grant.nil?
           logger&.warn "Authentication failure for #{@ip_address} (invalid credential)"
           increment_error_count("invalid-credentials")
+
+          # Track the failed attempt
+          if auth_failure_tracker&.record_failure_and_check_threshold
+            increment_prometheus_counter(:postal_smtp_server_auth_blocks_total)
+            logger&.warn "IP #{@ip_address} blocked after #{auth_failure_tracker.threshold} failed authentication attempts"
+          end
+
           next "535 Denied"
+        else
+          # Reset failure counter on successful authentication
+          auth_failure_tracker&.record_success
         end
 
         grant
@@ -589,6 +644,10 @@ module SMTPServer
         register_prometheus_counter :postal_smtp_server_messages_total,
                                     docstring: "The number of messages accepted by the SMTP server",
                                     labels: [:type, :tls]
+
+        register_prometheus_counter :postal_smtp_server_auth_blocks_total,
+                                    docstring: "The number of IP addresses blocked due to failed authentication attempts",
+                                    labels: []
       end
 
     end

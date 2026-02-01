@@ -97,6 +97,12 @@ Rails.application.routes.draw do
   get "admin/dashboard" => "admin_dashboard#index", as: "admin_dashboard"
   get "admin/mx_rate_limits" => "admin_mx_rate_limits#index", as: "admin_mx_rate_limits"
 
+  # Admin Blocked IPs
+  get "admin/blocked_ips" => "admin_blocked_ips#index", as: "admin_blocked_ips"
+  post "admin/blocked_ips/unblock" => "admin_blocked_ips#unblock", as: "unblock_admin_blocked_ips"
+  post "admin/blocked_ips/unblock_all" => "admin_blocked_ips#unblock_all", as: "unblock_all_admin_blocked_ips"
+  post "admin/blocked_ips/cleanup" => "admin_blocked_ips#cleanup", as: "cleanup_admin_blocked_ips"
+
   # IP Reputation Management (Phase 8)
   resources :ip_reputation, only: [:index] do
     collection do
