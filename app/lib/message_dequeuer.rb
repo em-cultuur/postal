@@ -20,7 +20,7 @@ module MessageDequeuer
           logger.warn "Deadlock detected (attempt #{retries}/#{MAX_DEADLOCK_RETRIES}), retrying in #{sleep_time.round(3)}s",
                       message_id: message.id,
                       error: e.message
-          sleep(sleep_time)
+          deadlock_sleep(sleep_time)
           retry
         else
           logger.error "Deadlock persisted after #{MAX_DEADLOCK_RETRIES} retries, requeueing message",
@@ -31,6 +31,12 @@ module MessageDequeuer
           raise
         end
       end
+    end
+
+    private
+
+    def deadlock_sleep(time)
+      sleep(time)
     end
 
   end

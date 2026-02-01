@@ -22,10 +22,14 @@
 #
 # Indexes
 #
-#  index_queued_messages_on_domain      (domain)
-#  index_queued_messages_on_message_id  (message_id)
-#  index_queued_messages_on_mx_domain   (mx_domain)
-#  index_queued_messages_on_server_id   (server_id)
+#  index_queued_messages_on_batch_lock           (batch_key,ip_address_id,locked_by,locked_at)
+#  index_queued_messages_on_domain               (domain)
+#  index_queued_messages_on_lock_and_retry       (locked_by,locked_at,retry_after,ip_address_id)
+#  index_queued_messages_on_message_id           (message_id)
+#  index_queued_messages_on_mx_domain            (mx_domain)
+#  index_queued_messages_on_server_domain_retry  (server_id,domain,retry_after)
+#  index_queued_messages_on_server_id            (server_id)
+#  index_queued_messages_on_server_mx_retry      (server_id,mx_domain,retry_after)
 #
 
 class QueuedMessage < ApplicationRecord

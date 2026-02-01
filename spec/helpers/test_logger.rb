@@ -44,4 +44,12 @@ class TestLogger
     !!log_line(match)
   end
 
+  def logged
+    result = Hash.new { |h, k| h[k] = [] }
+    @log_lines.each do |line|
+      result[line[:level]] << { text: line[:message], tags: line[:tags] }
+    end
+    result
+  end
+
 end

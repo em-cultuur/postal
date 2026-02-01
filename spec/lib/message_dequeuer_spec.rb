@@ -22,22 +22,28 @@ RSpec.describe MessageDequeuer do
 
       before do
         allow(MessageDequeuer::InitialProcessor).to receive(:new).and_return(processor)
+        # Mock sleep to avoid actual delays in tests
+        allow(described_class).to receive(:deadlock_sleep)
       end
 
       it "retries up to MAX_DEADLOCK_RETRIES times" do
         call_count = 0
+        max_retries = MessageDequeuer.singleton_class::MAX_DEADLOCK_RETRIES
         allow(processor).to receive(:process) do
           call_count += 1
-          raise ActiveRecord::Deadlocked, "Deadlock found" if call_count <= MessageDequeuer::MAX_DEADLOCK_RETRIES
+          raise ActiveRecord::Deadlocked, "Deadlock found" if call_count <= max_retries
         end
 
         expect { described_class.process(queued_message, logger: logger) }.not_to raise_error
-        expect(call_count).to eq(MessageDequeuer::MAX_DEADLOCK_RETRIES + 1)
+        expect(call_count).to eq(max_retries + 1)
       end
 
       it "logs warnings on each retry" do
-        allow(processor).to receive(:process).and_raise(ActiveRecord::Deadlocked, "Deadlock found").once
-                                             .and_return(true)
+        call_count = 0
+        allow(processor).to receive(:process) do
+          call_count += 1
+          raise ActiveRecord::Deadlocked, "Deadlock found" if call_count == 1
+        end
 
         described_class.process(queued_message, logger: logger)
 
@@ -46,11 +52,14 @@ RSpec.describe MessageDequeuer do
       end
 
       it "uses exponential backoff" do
-        allow(processor).to receive(:process).and_raise(ActiveRecord::Deadlocked, "Deadlock found").twice
-                                             .and_return(true)
+        call_count = 0
+        allow(processor).to receive(:process) do
+          call_count += 1
+          raise ActiveRecord::Deadlocked, "Deadlock found" if call_count <= 2
+        end
 
         sleep_times = []
-        allow_any_instance_of(Object).to receive(:sleep) { |_, time| sleep_times << time }
+        allow(described_class).to receive(:deadlock_sleep) { |time| sleep_times << time }
 
         described_class.process(queued_message, logger: logger)
 
