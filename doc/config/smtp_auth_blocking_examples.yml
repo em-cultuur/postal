@@ -1,0 +1,136 @@
+# Example Configuration for SMTP Authentication Failure Blocking
+
+# This file shows various configuration examples for the SMTP authentication
+# failure blocking system.
+
+# ============================================================================
+# Default Configuration (Balanced Security)
+# ============================================================================
+
+version: 2
+
+smtp_server:
+  # Block IP after 5 failed authentication attempts (default)
+  auth_failure_threshold: 5
+  
+  # Block for 120 minutes (2 hours) (default)
+  auth_failure_block_duration: 120
+
+# ============================================================================
+# Strict Security Configuration
+# ============================================================================
+# Use this for high-security environments where you want to be aggressive
+# about blocking potential attackers.
+
+# version: 2
+# 
+# smtp_server:
+#   # Block after just 3 failures
+#   auth_failure_threshold: 3
+#   
+#   # Block for 4 hours
+#   auth_failure_block_duration: 240
+
+# ============================================================================
+# Lenient Configuration
+# ============================================================================
+# Use this in environments where legitimate users might occasionally
+# mistype passwords or have misconfigured email clients.
+
+# version: 2
+# 
+# smtp_server:
+#   # Allow up to 10 failures before blocking
+#   auth_failure_threshold: 10
+#   
+#   # Block for only 30 minutes
+#   auth_failure_block_duration: 30
+
+# ============================================================================
+# Very Strict (For Known Attack Scenarios)
+# ============================================================================
+# Use this temporarily during active attacks or in extremely high-security
+# environments.
+
+# version: 2
+# 
+# smtp_server:
+#   # Block after 2 failures
+#   auth_failure_threshold: 2
+#   
+#   # Block for 24 hours
+#   auth_failure_block_duration: 1440
+
+# ============================================================================
+# Development/Testing Configuration
+# ============================================================================
+# Use this during development to test the blocking behavior more easily.
+
+# version: 2
+# 
+# smtp_server:
+#   # Block after 3 attempts (easy to trigger)
+#   auth_failure_threshold: 3
+#   
+#   # Block for only 5 minutes (easy to wait out)
+#   auth_failure_block_duration: 5
+
+# ============================================================================
+# Environment Variable Configuration
+# ============================================================================
+# Instead of using YAML, you can configure via environment variables:
+#
+# SMTP_SERVER__AUTH_FAILURE_THRESHOLD=5
+# SMTP_SERVER__AUTH_FAILURE_BLOCK_DURATION=120
+#
+# Environment variables take precedence over YAML configuration.
+
+# ============================================================================
+# Complete SMTP Server Configuration Example
+# ============================================================================
+
+version: 2
+
+smtp_server:
+  # Port and binding
+  default_port: 25
+  default_bind_address: "::"
+  
+  # TLS configuration
+  tls_enabled: true
+  tls_certificate_path: "$config-file-root/smtp.cert"
+  tls_private_key_path: "$config-file-root/smtp.key"
+  
+  # Message size limit (in MB)
+  max_message_size: 14
+  
+  # Authentication failure blocking
+  auth_failure_threshold: 5
+  auth_failure_block_duration: 120
+  
+  # Connection logging
+  log_connections: true
+  
+  # Health server
+  default_health_server_port: 9091
+  default_health_server_bind_address: "127.0.0.1"
+
+# ============================================================================
+# Monitoring
+# ============================================================================
+# Monitor these Prometheus metrics:
+#
+# postal_smtp_server_auth_blocks_total
+#   - Total number of IPs blocked
+#
+# postal_smtp_server_client_errors{error="ip-blocked"}
+#   - Number of blocked authentication attempts
+#
+# postal_smtp_server_client_errors{error="invalid-credentials"}
+#   - Number of failed authentication attempts
+#
+# Set up alerts:
+#
+# - Alert if blocking rate is high (indicates ongoing attack)
+# - Alert if failure rate is high (indicates misconfiguration or attack)
+# - Alert if specific IPs are frequently blocked (investigate those IPs)
