@@ -159,6 +159,28 @@ module IPBlacklist
       },
     ].freeze
 
+    # Proofpoint-specific patterns (optimized for ReDoS protection)
+    PROOFPOINT_PATTERNS = [
+      {
+        regex: /\A.{0,200}554[- ]5\.7\.0.{0,50}Blocked.{0,200}proofpoint\.com\/dnsbl-lookup/i,
+        source: "proofpoint_dnsbl_block",
+        severity: "high",
+        description: "Proofpoint DNSBL blocking - IP listed on Proofpoint's reputation database"
+      },
+      {
+        regex: /\A.{0,200}554[- ]5\.7\.1.{0,50}Service unavailable.{0,100}proofpoint/i,
+        source: "proofpoint_reputation_block",
+        severity: "high",
+        description: "Proofpoint reputation-based blocking"
+      },
+      {
+        regex: /\A.{0,200}421[- ]4\.7\.1.{0,100}proofpoint/i,
+        source: "proofpoint_temporary_block",
+        severity: "medium",
+        description: "Proofpoint temporary deferral - possible reputation issue"
+      },
+    ].freeze
+
     # Parse SMTP response message and code
     #
     # @param message [String] The SMTP error message
@@ -195,7 +217,8 @@ module IPBlacklist
           # Check for provider-specific patterns first (most specific)
           # iCloud patterns checked before Gmail to avoid conflicts with generic patterns
           # then generic DNSBL patterns (fallback)
-          check_icloud_patterns(safe_message, result) ||
+          check_proofpoint_patterns(safe_message, result) ||
+            check_icloud_patterns(safe_message, result) ||
             check_gmail_patterns(safe_message, result) ||
             check_outlook_patterns(safe_message, result) ||
             check_yahoo_patterns(safe_message, result) ||
@@ -295,6 +318,20 @@ module IPBlacklist
     # @private
     def self.check_icloud_patterns(message, result)
       ICLOUD_PATTERNS.each do |pattern|
+        next unless message =~ pattern[:regex]
+
+        result[:blacklist_detected] = true
+        result[:blacklist_source] = pattern[:source]
+        result[:severity] = pattern[:severity]
+        result[:description] = pattern[:description]
+        return true
+      end
+      false
+    end
+
+    # @private
+    def self.check_proofpoint_patterns(message, result)
+      PROOFPOINT_PATTERNS.each do |pattern|
         next unless message =~ pattern[:regex]
 
         result[:blacklist_detected] = true

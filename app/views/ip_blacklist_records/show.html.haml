@@ -68,6 +68,22 @@
         %th Updated At
         %td= @record.updated_at.strftime("%Y-%m-%d %H:%M:%S")
 
+  - if @record.detected_via_smtp? && @record.smtp_response_message.present?
+    %h2.sectionTitle SMTP Response Details
+
+    %table.dataTable.u-margin
+      %tbody
+        - if @record.smtp_response_code.present?
+          %tr
+            %th{:width => "30%"} SMTP Response Code
+            %td
+              %code.label.label--red= @record.smtp_response_code
+        %tr
+          %th SMTP Response Message
+          %td
+            .codeBlock
+              %pre= @record.smtp_response_message
+
   - if @record.detected_via_smtp? && @record.active?
     %h2.sectionTitle Retry Information
 

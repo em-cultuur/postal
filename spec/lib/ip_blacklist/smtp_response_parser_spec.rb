@@ -217,6 +217,39 @@ RSpec.describe IPBlacklist::SMTPResponseParser do
       end
     end
 
+    context "Proofpoint patterns" do
+      it "detects Proofpoint DNSBL block" do
+        message = "554 5.7.0 Blocked - see https://support.proofpoint.com/dnsbl-lookup.cgi?ip=5.196.61.193"
+        result = described_class.parse(message, "554")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("proofpoint_dnsbl_block")
+        expect(result[:severity]).to eq("high")
+        expect(result[:bounce_type]).to eq("hard")
+        expect(result[:suggested_action]).to eq("pause_immediately")
+      end
+
+      it "detects Proofpoint reputation block" do
+        message = "554 5.7.1 Service unavailable; Host is blocked by Proofpoint"
+        result = described_class.parse(message, "554")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("proofpoint_reputation_block")
+        expect(result[:severity]).to eq("high")
+      end
+
+      it "detects Proofpoint temporary block" do
+        message = "421 4.7.1 Service temporarily unavailable - contact Proofpoint for assistance"
+        result = described_class.parse(message, "421")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("proofpoint_temporary_block")
+        expect(result[:severity]).to eq("medium")
+        expect(result[:bounce_type]).to eq("soft")
+        expect(result[:suggested_action]).to eq("monitor_closely")
+      end
+    end
+
     context "Generic DNSBL patterns" do
       it "detects Spamhaus ZEN listing" do
         message = "554 Service unavailable; Client host [192.0.2.1] blocked using zen.spamhaus.org"
