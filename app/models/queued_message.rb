@@ -118,21 +118,8 @@ class QueuedMessage < ApplicationRecord
     else
       time = Time.now
       locker = Postal.locker_name
-
-      # Use a transaction with a shorter lock wait timeout to prevent deadlocks
-      begin
-        ActiveRecord::Base.connection.execute("SET SESSION innodb_lock_wait_timeout = 1")
-        self.class.ready.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: nil, locked_at: nil).limit(limit).update_all(locked_by: locker, locked_at: time)
-        QueuedMessage.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: locker, locked_at: time).where.not(id: id)
-      rescue ActiveRecord::StatementInvalid => e
-        # If we get a lock timeout, return empty array rather than failing
-        raise unless e.message.include?("Lock wait timeout") || e.message.include?("Deadlock")
-
-        []
-      ensure
-        # Reset to default timeout
-        ActiveRecord::Base.connection.execute("SET SESSION innodb_lock_wait_timeout = DEFAULT")
-      end
+      self.class.ready.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: nil, locked_at: nil).limit(limit).update_all(locked_by: locker, locked_at: time)
+      QueuedMessage.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: locker, locked_at: time).where.not(id: id)
     end
   end
 
