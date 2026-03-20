@@ -34,6 +34,9 @@ module IPBlacklist
       /sbl\.spamhaus\.org/i => "spamhaus_sbl",
       /xbl\.spamhaus\.org/i => "spamhaus_xbl",
       /pbl\.spamhaus\.org/i => "spamhaus_pbl",
+      # Match "blocked using Spamhaus" (Microsoft/Exchange format without explicit DNSBL domain)
+      /blocked\s+using\s+spamhaus/i => "spamhaus_generic",
+      /spamhaus/i => "spamhaus_generic",
       /bl\.spamcop\.net/i => "spamcop",
       /b\.barracudacentral\.org/i => "barracuda",
       /dnsbl\.sorbs\.net/i => "sorbs",
@@ -44,7 +47,9 @@ module IPBlacklist
       /dnsbl/i => "generic_dnsbl",
       /blacklist/i => "generic_blacklist",
       /blocklist/i => "generic_blocklist",
-      /\bRBL\b/i => "generic_rbl"
+      /\bRBL\b/i => "generic_rbl",
+      # Match "blocked using <any blacklist name>" - generic Microsoft/Exchange format
+      /blocked\s+using\b/i => "generic_blocked_using"
     }.freeze
 
     # Gmail-specific patterns (optimized for ReDoS protection)
@@ -94,6 +99,14 @@ module IPBlacklist
         source: "outlook_ip_blocked",
         severity: "high",
         description: "Outlook/Hotmail IP blocking"
+      },
+      {
+        # Matches: "550 5.7.1 Service unavailable, Client host [x.x.x.x] blocked using Spamhaus."
+        # and similar Microsoft/Exchange messages with DNSBL name but without explicit DNSBL domain
+        regex: /\A.{0,200}550[- ]5\.7\.1.{0,80}Service unavailable.{0,80}Client host.{0,80}blocked using/i,
+        source: "outlook_blocked_using_dnsbl",
+        severity: "high",
+        description: "Outlook/Exchange IP blocked via DNSBL (e.g. Spamhaus, Barracuda)"
       },
       {
         regex: /\A.{0,200}550[- ]5\.7\.1.{0,50}blocked.{0,50}IP reputation/i,

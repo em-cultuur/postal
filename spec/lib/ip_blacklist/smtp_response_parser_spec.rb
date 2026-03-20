@@ -151,6 +151,30 @@ RSpec.describe IPBlacklist::SMTPResponseParser do
         expect(result[:severity]).to eq("medium")
         expect(result[:bounce_type]).to eq("soft")
       end
+
+      it "detects Outlook/Exchange 'blocked using Spamhaus' format (without explicit DNSBL domain)" do
+        message = "550 5.7.1 Service unavailable, Client host [51.38.27.245] blocked using Spamhaus. " \
+                  "To request removal from this list see https://www.spamhaus.org/query/ip/51.38.27.245 (AS3130). " \
+                  "[Name=Protocol Filter Agent][AGT=PFA][MxId=11BD0A29A5D92F32] [DB1PEPF0005"
+        result = described_class.parse(message, "550")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("outlook_blocked_using_dnsbl")
+        expect(result[:severity]).to eq("high")
+        expect(result[:bounce_type]).to eq("hard")
+        expect(result[:suggested_action]).to eq("pause_immediately")
+      end
+
+      it "detects Outlook/Exchange 'blocked using Barracuda' format" do
+        message = "550 5.7.1 Service unavailable, Client host [1.2.3.4] blocked using Barracuda. " \
+                  "To request removal see https://www.barracudacentral.org/"
+        result = described_class.parse(message, "550")
+
+        expect(result[:blacklist_detected]).to be true
+        expect(result[:blacklist_source]).to eq("outlook_blocked_using_dnsbl")
+        expect(result[:severity]).to eq("high")
+        expect(result[:bounce_type]).to eq("hard")
+      end
     end
 
     context "Yahoo patterns" do
