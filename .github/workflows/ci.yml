@@ -1,14 +1,6 @@
 ---
 name: CI
-on:
-  push:
-  pull_request:
-
-permissions:
-  contents: write
-  packages: write
-  issues: write
-  pull-requests: write
+on: [push]
 
 jobs:
   release-please:
@@ -24,7 +16,6 @@ jobs:
         id: release-please
         with:
           command: manifest
-          release-type: manifest
 
   build:
     name: CI Image Build
@@ -33,38 +24,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.REPO_ACCESS_TOKEN }}
-      - name: Build and push (non-PR)
-        if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v4
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v4
         with:
           push: true
           tags: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          target: full
+          target: ci
           platforms: linux/amd64
-      - name: Build and export (PR)
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v4
-        with:
-          tags: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          target: full
-          outputs: type=docker,dest=/tmp/postal-image.tar
-      - name: Upload image artifact
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: postal-image
-          path: /tmp/postal-image.tar
-          retention-days: 1
 
   test:
     name: Test Suite
@@ -74,41 +47,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Download image artifact (PR)
-        if: github.event_name == 'pull_request'
-        uses: actions/download-artifact@v4
-        with:
-          name: postal-image
-          path: /tmp
-      - name: Load Docker image (PR)
-        if: github.event_name == 'pull_request'
-        run: docker load --input /tmp/postal-image.tar
-      - uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
+      - uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.REPO_ACCESS_TOKEN }}
-      - name: Pull image (non-PR)
-        if: github.event_name != 'pull_request'
-        run: docker compose pull
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker compose pull
         env:
           POSTAL_IMAGE: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
-      - name: Pull mariadb only (PR)
-        if: github.event_name == 'pull_request'
-        run: docker compose pull mariadb
-        env:
-          POSTAL_IMAGE: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
-      - name: Prepare database
-        run: docker compose run --rm postal sh -c 'bundle exec rails db:prepare'
-        env:
-          POSTAL_IMAGE: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
-      - run: docker compose run --rm postal sh -c 'bundle exec rspec'
-        env:
-          POSTAL_IMAGE: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
-      - name: Cleanup
-        if: always()
-        run: docker compose down -v
+      - run: docker compose run postal sh -c 'bundle exec rspec'
         env:
           POSTAL_IMAGE: ghcr.io/em-cultuur/postal:ci-${{ github.sha }}
 
@@ -125,21 +72,18 @@ jobs:
         with:
           fetch-depth: 0
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.REPO_ACCESS_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - id: info
         run: |
           IMAGE=ghcr.io/em-cultuur/postal
 
           REF="${GITHUB_REF#refs/heads/}"
           if [ -z "$REF" ]; then exit 1; fi
-          
-          # Sanitize branch name for Docker tag (replace / with -)
-          SAFE_REF="${REF//\//-}"
 
           VER="$(git describe --tags 2>/dev/null)"
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
@@ -149,7 +93,7 @@ jobs:
           if [[ "$REF" == "main" ]]; then
             echo "${IMAGE}:latest" >> "$GITHUB_OUTPUT"
           else
-            echo "${IMAGE}:branch-${SAFE_REF}" >> "$GITHUB_OUTPUT"
+            echo "${IMAGE}:branch-${REF}" >> "$GITHUB_OUTPUT"
           fi
           echo 'EOF' >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v4
@@ -172,12 +116,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.REPO_ACCESS_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v4
         with:
           push: true
