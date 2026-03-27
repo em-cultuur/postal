@@ -66,6 +66,11 @@ module Postal
         default true
       end
 
+      boolean :use_message_tags_for_bounces do
+        description "Use message tags when assigning bounces to their corresponding messages"
+        default false
+      end
+
       integer :default_dkim_key_size do
         description "The default size for new DKIM keys"
         default 1024
