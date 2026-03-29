@@ -2,6 +2,13 @@
 
 This file contains all the latest changes and updates to Postal.
 
+## [3.3.6](https://github.com/em-cultuur/postal/compare/3.3.5...3.3.6) (2026-03-29)
+
+
+### Bug Fixes
+
+* add_message_token_for_bounces ([205e0a8](https://github.com/em-cultuur/postal/commit/205e0a81b82ceaa5c815d477c7932689788b3218))
+
 ## [3.3.5](https://github.com/postalserver/postal/compare/3.3.4...3.3.5) (2026-02-01)
 
 
