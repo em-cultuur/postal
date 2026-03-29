@@ -70,7 +70,7 @@ class IPBlacklistRecordsController < ApplicationController
     @record.mark_resolved!
 
     # Trigger warmup if configured and domain-specific
-    if @record.destination_domain.present? && Postal::Config.ip_reputation&.auto_warmup_on_delist != false
+    if @record.destination_domain.present? && Postal::Config.postal.ip_reputation_auto_warmup_on_delist == true
       IPBlacklist::WarmupManager.start_warmup(
         @record.ip_address,
         @record.destination_domain,

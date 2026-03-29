@@ -439,15 +439,9 @@ class SMTPSender < BaseSender
   # @return [Boolean]
   #
   def smtp_response_analysis_enabled?
-    # Check configuration - default to true if not specified
-    return true unless Postal::Config.postal.respond_to?(:ip_reputation)
-
-    config = Postal::Config.postal.ip_reputation
-    return true unless config.respond_to?(:smtp_response_analysis)
-
-    config.smtp_response_analysis.enabled != false
+    Postal::Config.postal.ip_reputation_smtp_analysis_enabled == true
   rescue StandardError
-    true # Default to enabled if config access fails
+    false
   end
 
   # Get soft bounce threshold from config
@@ -455,10 +449,7 @@ class SMTPSender < BaseSender
   # @return [Integer]
   #
   def smtp_soft_bounce_threshold
-    return IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD unless Postal::Config.postal.respond_to?(:ip_reputation)
-
-    config = Postal::Config.postal.ip_reputation&.smtp_response_analysis
-    config&.soft_bounce_threshold || IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD
+    Postal::Config.postal.ip_reputation_soft_bounce_threshold || IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD
   rescue StandardError
     IPBlacklist::SoftBounceTracker::DEFAULT_THRESHOLD
   end
@@ -468,10 +459,7 @@ class SMTPSender < BaseSender
   # @return [Integer]
   #
   def smtp_soft_bounce_window
-    return IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES unless Postal::Config.postal.respond_to?(:ip_reputation)
-
-    config = Postal::Config.postal.ip_reputation&.smtp_response_analysis
-    config&.soft_bounce_window_minutes || IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES
+    Postal::Config.postal.ip_reputation_soft_bounce_window_minutes || IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES
   rescue StandardError
     IPBlacklist::SoftBounceTracker::DEFAULT_WINDOW_MINUTES
   end

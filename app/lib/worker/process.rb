@@ -34,15 +34,21 @@ module Worker
     # @return [Array<Class>]
     TASKS = [
       ActionDeletionsScheduledTask,
+      AggregateIPMetricsScheduledTask,
       CheckAllDNSScheduledTask,
+      CheckIPBlacklistsScheduledTask,
       CleanupAuthieSessionsScheduledTask,
       CleanupMXRateLimitDataTask,
       ExpireHeldMessagesScheduledTask,
+      ProcessIPWarmupScheduledTask,
       ProcessMessageRetentionScheduledTask,
       PruneDomainThrottlesScheduledTask,
       PruneSuppressionListsScheduledTask,
       PruneWebhookRequestsScheduledTask,
+      RecheckResolvedBlacklistsScheduledTask,
+      RetryBlacklistedIpsScheduledTask,
       SendNotificationsScheduledTask,
+      SyncExternalReputationScheduledTask,
       TidyQueuedMessagesTask,
     ].freeze
 

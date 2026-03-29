@@ -253,7 +253,7 @@ module IPMetrics
     end
 
     def load_config_minimum_volume
-      Postal::Config.ip_reputation&.metrics&.minimum_volume
+      Postal::Config.postal.ip_reputation_threshold_monitoring_minimum_volume
     rescue StandardError
       nil
     end
