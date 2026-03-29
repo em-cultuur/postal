@@ -2,6 +2,14 @@
 
 This file contains all the latest changes and updates to Postal.
 
+## [3.6.1](https://github.com/em-cultuur/postal/compare/3.6.0...3.6.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* missing tasks and some mix-ups in configs ([7bd4b23](https://github.com/em-cultuur/postal/commit/7bd4b23e461c34aeea8fa64cdbce84519dd827e4))
+* translate Italian to English ([30c0ed9](https://github.com/em-cultuur/postal/commit/30c0ed95a074ff394aa139e7a5f6c7e8ff9c3608))
+
 ## [3.6.0](https://github.com/em-cultuur/postal/compare/3.5.2...3.6.0) (2026-03-27)
 
 
