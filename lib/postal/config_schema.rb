@@ -184,7 +184,7 @@ module Postal
 
       boolean :ip_reputation_smtp_analysis_enabled do
         description "Enable automatic analysis of SMTP error responses for blacklist indicators"
-        default true
+        default false
       end
 
       integer :ip_reputation_soft_bounce_threshold do
@@ -209,6 +209,21 @@ module Postal
 
       string :ip_reputation_notification_slack_webhook do
         description "Slack webhook URL to send notifications to"
+      end
+
+      boolean :ip_reputation_auto_warmup_on_delist do
+        description "Automatically start IP warmup process when an IP is delisted from a blacklist"
+        default false
+      end
+
+      boolean :ip_reputation_threshold_monitoring_enabled do
+        description "Enable automatic threshold monitoring that can pause IPs when critical reputation metrics are detected"
+        default false
+      end
+
+      integer :ip_reputation_threshold_monitoring_minimum_volume do
+        description "Minimum number of messages sent before threshold monitoring takes effect"
+        default 10
       end
     end
 
@@ -809,6 +824,7 @@ module Postal
         description "Microsoft SNDS complaint rate threshold (decimal) for warnings (e.g., 0.001 for 0.1%)"
         default 0.001
       end
+
     end
   end
 

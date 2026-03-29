@@ -21,7 +21,7 @@ class AggregateIPMetricsScheduledTask < ApplicationScheduledTask
       IPMetrics::Aggregator.aggregate(period: IPReputationMetric::DAILY, period_date: Date.yesterday)
 
       # Monitor thresholds and trigger actions if needed
-      if Postal::Config.ip_reputation&.metrics&.threshold_monitoring_enabled != false
+      if Postal::Config.postal.ip_reputation_threshold_monitoring_enabled == true
         logger.info "[IP METRICS] Running threshold monitoring..."
         monitor_thresholds
       end
@@ -132,7 +132,7 @@ class AggregateIPMetricsScheduledTask < ApplicationScheduledTask
   def minimum_volume_threshold
     # Only monitor IPs with meaningful send volume
     # Default: at least 10 messages in the period
-    Postal::Config.ip_reputation&.metrics&.minimum_volume || 10
+    Postal::Config.postal.ip_reputation_threshold_monitoring_minimum_volume || 10
   end
 
 end
