@@ -1,171 +1,171 @@
-# Implementazione MTA-STS e TLS-RPT in Postal
+# MTA-STS and TLS-RPT Implementation in Postal
 
-## Panoramica
+## Overview
 
-Questa implementazione aggiunge il supporto per MTA-STS (SMTP MTA Strict Transport Security) e TLS-RPT (TLS Reporting) a Postal, migliorando la sicurezza delle comunicazioni email.
+This implementation adds support for MTA-STS (SMTP MTA Strict Transport Security) and TLS-RPT (TLS Reporting) to Postal, improving the security of email communications.
 
-## Componenti Implementati
+## Implemented Components
 
 ### 1. Database Migration
 **File:** `db/migrate/20251107000001_add_mta_sts_and_tls_rpt_to_domains.rb`
 
-Aggiunge i seguenti campi alla tabella `domains`:
-- `mta_sts_enabled` (boolean): Abilita/disabilita MTA-STS
-- `mta_sts_mode` (string): Modalità policy (testing, enforce, none)
-- `mta_sts_max_age` (integer): Durata cache della policy in secondi
-- `mta_sts_mx_patterns` (text): Pattern MX personalizzati (uno per riga)
-- `mta_sts_status` (string): Stato verifica DNS
-- `mta_sts_error` (string): Messaggio errore verifica DNS
-- `tls_rpt_enabled` (boolean): Abilita/disabilita TLS-RPT
-- `tls_rpt_email` (string): Email per ricevere report TLS
-- `tls_rpt_status` (string): Stato verifica DNS
-- `tls_rpt_error` (string): Messaggio errore verifica DNS
+Adds the following fields to the `domains` table:
+- `mta_sts_enabled` (boolean): Enables/disables MTA-STS
+- `mta_sts_mode` (string): Policy mode (testing, enforce, none)
+- `mta_sts_max_age` (integer): Policy cache duration in seconds
+- `mta_sts_mx_patterns` (text): Custom MX patterns (one per line)
+- `mta_sts_status` (string): DNS verification status
+- `mta_sts_error` (string): DNS verification error message
+- `tls_rpt_enabled` (boolean): Enables/disables TLS-RPT
+- `tls_rpt_email` (string): Email to receive TLS reports
+- `tls_rpt_status` (string): DNS verification status
+- `tls_rpt_error` (string): DNS verification error message
 
-### 2. Model Domain
+### 2. Domain Model
 **File:** `app/models/domain.rb`
 
-#### Metodi MTA-STS:
-- `mta_sts_record_name`: Nome record DNS (_mta-sts.domain.com)
-- `mta_sts_record_value`: Valore del record DNS TXT
-- `mta_sts_policy_id`: ID univoco della policy (basato su hash della configurazione)
-- `mta_sts_policy_content`: Contenuto del file policy in formato testo
-- `default_mta_sts_mx_patterns`: Pattern MX di default da configurazione Postal
+#### MTA-STS Methods:
+- `mta_sts_record_name`: DNS record name (_mta-sts.domain.com)
+- `mta_sts_record_value`: DNS TXT record value
+- `mta_sts_policy_id`: Unique policy ID (based on configuration hash)
+- `mta_sts_policy_content`: Policy file content in text format
+- `default_mta_sts_mx_patterns`: Default MX patterns from Postal configuration
 
-#### Metodi TLS-RPT:
-- `tls_rpt_record_name`: Nome record DNS (_smtp._tls.domain.com)
-- `tls_rpt_record_value`: Valore del record DNS TXT
-- `default_tls_rpt_email`: Email di default per report
+#### TLS-RPT Methods:
+- `tls_rpt_record_name`: DNS record name (_smtp._tls.domain.com)
+- `tls_rpt_record_value`: DNS TXT record value
+- `default_tls_rpt_email`: Default email for reports
 
-### 3. Concern HasDNSChecks
+### 3. HasDNSChecks Concern
 **File:** `app/models/concerns/has_dns_checks.rb`
 
-#### Metodi aggiunti:
-- `check_mta_sts_record`: Verifica il record DNS MTA-STS e la disponibilità HTTPS del file policy
-- `check_mta_sts_record!`: Verifica e salva
-- `check_mta_sts_policy_file`: Verifica l'accessibilità e validità del file policy via HTTPS
-- `check_tls_rpt_record`: Verifica il record DNS TLS-RPT
-- `check_tls_rpt_record!`: Verifica e salva
+#### Added Methods:
+- `check_mta_sts_record`: Verifies the MTA-STS DNS record and HTTPS availability of the policy file
+- `check_mta_sts_record!`: Verifies and saves
+- `check_mta_sts_policy_file`: Verifies the accessibility and validity of the policy file via HTTPS
+- `check_tls_rpt_record`: Verifies the TLS-RPT DNS record
+- `check_tls_rpt_record!`: Verifies and saves
 
-Il metodo `check_dns` è stato esteso per includere le verifiche MTA-STS e TLS-RPT.
+The `check_dns` method has been extended to include MTA-STS and TLS-RPT verifications.
 
-**Verifica HTTPS della Policy:**
-Il metodo `check_mta_sts_policy_file` effettua i seguenti controlli:
-- Connessione HTTPS a `https://mta-sts.domain.com/.well-known/mta-sts.txt`
-- Verifica del certificato SSL
-- Verifica che il server risponda con HTTP 200
-- Validazione del contenuto del file policy:
-  - Presenza di `version: STSv1`
-  - Presenza di una modalità valida (testing, enforce, none)
-  - Presenza di un valore max_age valido
-- Timeout configurato a 10 secondi per apertura e lettura
-- Gestione dettagliata degli errori (SSL, timeout, HTTP, formato)
+**HTTPS Policy Verification:**
+The `check_mta_sts_policy_file` method performs the following checks:
+- HTTPS connection to `https://mta-sts.domain.com/.well-known/mta-sts.txt`
+- SSL certificate verification
+- Verification that the server responds with HTTP 200
+- Policy file content validation:
+  - Presence of `version: STSv1`
+  - Presence of a valid mode (testing, enforce, none)
+  - Presence of a valid max_age value
+- Timeout configured at 10 seconds for opening and reading
+- Detailed error handling (SSL, timeout, HTTP, format)
 
-### 4. Controller MTA-STS
+### 4. MTA-STS Controller
 **File:** `app/controllers/mta_sts_controller.rb`
 
-Serve la policy MTA-STS tramite l'endpoint pubblico:
+Serves the MTA-STS policy via the public endpoint:
 - **Route:** `GET /.well-known/mta-sts.txt`
 - **Host:** `mta-sts.domain.com`
-- Restituisce il file policy in formato plain text
-- Cache-Control header configurato con max_age del dominio
-- Verifica che il dominio sia verificato e abbia MTA-STS abilitato
+- Returns the policy file in plain text format
+- Cache-Control header configured with the domain's max_age
+- Verifies that the domain is verified and has MTA-STS enabled
 
-### 5. Controller Domains
+### 5. Domains Controller
 **File:** `app/controllers/domains_controller.rb`
 
-#### Nuove actions:
-- `edit_security`: Mostra il form di configurazione MTA-STS/TLS-RPT
-- `update_security`: Aggiorna le impostazioni di sicurezza
-- `check_mta_sts_policy`: Verifica manualmente l'accessibilità del file policy MTA-STS via HTTPS (supporta formati JSON e JS)
+#### New Actions:
+- `edit_security`: Shows the MTA-STS/TLS-RPT configuration form
+- `update_security`: Updates security settings
+- `check_mta_sts_policy`: Manually verifies the accessibility of the MTA-STS policy file via HTTPS (supports JSON and JS formats)
 
-### 6. Viste
+### 6. Views
 
 #### `app/views/domains/setup.html.haml`
-Estesa con sezioni per mostrare:
-- Istruzioni per configurare il record DNS MTA-STS
-- Istruzioni per configurare il record DNS TLS-RPT
-- Stato delle verifiche DNS
-- Link alla configurazione delle policy
-- **Pulsante per testare l'accessibilità del file policy MTA-STS via HTTPS**
-- Link diretto per visualizzare il file policy nel browser
+Extended with sections to show:
+- Instructions for configuring the MTA-STS DNS record
+- Instructions for configuring the TLS-RPT DNS record
+- DNS verification status
+- Link to policy configuration
+- **Button to test MTA-STS policy file accessibility via HTTPS**
+- Direct link to view the policy file in the browser
 
 #### `app/views/domains/edit_security.html.haml`
-Form completo per configurare:
-- Abilitazione MTA-STS
-- Modalità policy (testing/enforce/none)
-- Max age della policy
-- Pattern MX personalizzati
-- Abilitazione TLS-RPT
-- Email per report TLS
+Complete form to configure:
+- MTA-STS enabling
+- Policy mode (testing/enforce/none)
+- Policy max age
+- Custom MX patterns
+- TLS-RPT enabling
+- TLS report email
 
 ### 7. Routes
 **File:** `config/routes.rb`
 
-Nuove route aggiunte:
+New routes added:
 ```ruby
-# Policy endpoint pubblico
+# Public policy endpoint
 get ".well-known/mta-sts.txt" => "mta_sts#policy"
 
-# Configurazione sicurezza domini (sia per org che per server)
+# Domain security configuration (for both org and server)
 get :edit_security, on: :member
 patch :update_security, on: :member
-post :check_mta_sts_policy, on: :member  # Verifica manuale policy HTTPS
+post :check_mta_sts_policy, on: :member  # Manual HTTPS policy verification
 ```
 
-## Come Utilizzare
+## How to Use
 
-### 1. Configurazione MTA-STS
+### 1. MTA-STS Configuration
 
-1. Accedi alla pagina del dominio
-2. Clicca su "Configure MTA-STS & TLS-RPT"
-3. Abilita MTA-STS
-4. Seleziona la modalità:
-   - **Testing**: Ricevi report ma non bloccare email
-   - **Enforce**: Rifiuta email non inviate via TLS sicuro
-   - **None**: Disabilita MTA-STS
-5. Imposta il Max Age (consigliato: 604800 = 7 giorni)
-6. Opzionalmente, specifica pattern MX personalizzati
-7. Salva le impostazioni
+1. Go to the domain page
+2. Click on "Configure MTA-STS & TLS-RPT"
+3. Enable MTA-STS
+4. Select the mode:
+   - **Testing**: Receive reports but don't block emails
+   - **Enforce**: Reject emails not sent via secure TLS
+   - **None**: Disable MTA-STS
+5. Set the Max Age (recommended: 604800 = 7 days)
+6. Optionally, specify custom MX patterns
+7. Save the settings
 
-### 2. Configurazione DNS MTA-STS
+### 2. MTA-STS DNS Configuration
 
-Dopo aver abilitato MTA-STS, configura i seguenti record DNS:
+After enabling MTA-STS, configure the following DNS records:
 
-#### Record TXT
+#### TXT Record
 ```
-Nome: _mta-sts.tuodominio.com
-Valore: v=STSv1; id=<policy-id>;
-```
-
-#### Record A o CNAME
-```
-Nome: mta-sts.tuodominio.com
-Valore: <IP-o-hostname-del-tuo-postal>
+Name: _mta-sts.yourdomain.com
+Value: v=STSv1; id=<policy-id>;
 ```
 
-### 3. Configurazione TLS-RPT
-
-1. Nella stessa pagina di configurazione, abilita TLS-RPT
-2. Specifica un'email per ricevere i report (opzionale)
-3. Salva le impostazioni
-
-### 4. Configurazione DNS TLS-RPT
-
+#### A or CNAME Record
 ```
-Nome: _smtp._tls.tuodominio.com
-Tipo: TXT
-Valore: v=TLSRPTv1; rua=mailto:tls-reports@tuodominio.com
+Name: mta-sts.yourdomain.com
+Value: <IP-or-hostname-of-your-postal>
 ```
 
-### 5. Verifica DNS
+### 3. TLS-RPT Configuration
 
-1. Torna alla pagina "DNS Setup"
-2. Clicca su "Check my records are correct"
-3. Verifica che tutti i record siano configurati correttamente
+1. On the same configuration page, enable TLS-RPT
+2. Specify an email to receive reports (optional)
+3. Save the settings
 
-## Formato File Policy MTA-STS
+### 4. TLS-RPT DNS Configuration
 
-Il file servito su `https://mta-sts.domain.com/.well-known/mta-sts.txt` ha il seguente formato:
+```
+Name: _smtp._tls.yourdomain.com
+Type: TXT
+Value: v=TLSRPTv1; rua=mailto:tls-reports@yourdomain.com
+```
+
+### 5. DNS Verification
+
+1. Return to the "DNS Setup" page
+2. Click on "Check my records are correct"
+3. Verify that all records are configured correctly
+
+## MTA-STS Policy File Format
+
+The file served at `https://mta-sts.domain.com/.well-known/mta-sts.txt` has the following format:
 
 ```
 version: STSv1
@@ -175,52 +175,51 @@ mx: mx1.example.com
 max_age: 604800
 ```
 
-## Note Tecniche
+## Technical Notes
 
 ### Policy ID
-L'ID della policy viene generato automaticamente tramite hash SHA256 della configurazione corrente (modo, max_age, pattern MX, timestamp). Questo garantisce che l'ID cambi ogni volta che la policy viene modificata, forzando i client a scaricare la nuova policy.
+The policy ID is automatically generated via SHA256 hash of the current configuration (mode, max_age, MX patterns, timestamp). This ensures that the ID changes every time the policy is modified, forcing clients to download the new policy.
 
 ### Cache
-Il file policy viene servito con header `Cache-Control` configurato secondo il `max_age` del dominio, permettendo ai server di posta di cachare la policy per il periodo specificato.
+The policy file is served with a `Cache-Control` header configured according to the domain's `max_age`, allowing mail servers to cache the policy for the specified period.
 
-### Sicurezza
-- Solo i domini verificati possono servire policy MTA-STS
-- Il controller MTA-STS è pubblico (no autenticazione richiesta)
-- Supporta hosting di più domini sulla stessa istanza Postal
+### Security
+- Only verified domains can serve MTA-STS policies
+- The MTA-STS controller is public (no authentication required)
+- Supports hosting multiple domains on the same Postal instance
 
-### Pattern MX
-Se non specificati pattern MX personalizzati, vengono utilizzati automaticamente gli MX record configurati in `Postal::Config.dns.mx_records` con wildcard (`*.mx.example.com`).
+### MX Patterns
+If custom MX patterns are not specified, the MX records configured in `Postal::Config.dns.mx_records` are automatically used with wildcards (`*.mx.example.com`).
 
-## Riferimenti
+## References
 
 - [RFC 8461 - MTA-STS](https://datatracker.ietf.org/doc/html/rfc8461)
 - [RFC 8460 - TLS-RPT](https://datatracker.ietf.org/doc/html/rfc8460)
 
 ## Testing
 
-Per testare l'implementazione:
+To test the implementation:
 
-1. Configura un dominio di test
-2. Abilita MTA-STS in modalità "testing"
-3. Configura i record DNS
-4. Verifica che il file policy sia accessibile: `curl https://mta-sts.tuodominio.com/.well-known/mta-sts.txt`
-5. Usa strumenti online come [MTA-STS Validator](https://aykevl.nl/apps/mta-sts/) per validare la configurazione
-6. Dopo alcuni giorni di testing, passa a modalità "enforce"
+1. Configure a test domain
+2. Enable MTA-STS in "testing" mode
+3. Configure the DNS records
+4. Verify that the policy file is accessible: `curl https://mta-sts.yourdomain.com/.well-known/mta-sts.txt`
+5. Use online tools such as [MTA-STS Validator](https://aykevl.nl/apps/mta-sts/) to validate the configuration
+6. After a few days of testing, switch to "enforce" mode
 
 ## Troubleshooting
 
-### Policy non accessibile
-- Verifica che il record A/CNAME per mta-sts.domain.com punti correttamente
-- Verifica che il certificato SSL sia valido per mta-sts.domain.com
-- Controlla i log di Postal per errori
+### Policy not accessible
+- Verify that the A/CNAME record for mta-sts.domain.com points correctly
+- Verify that the SSL certificate is valid for mta-sts.domain.com
+- Check the Postal logs for errors
 
-### Record DNS non verificati
-- Attendi la propagazione DNS (può richiedere fino a 48 ore)
-- Verifica che i record siano configurati correttamente nel tuo provider DNS
-- Usa `dig` o `nslookup` per verificare i record manualmente
+### DNS records not verified
+- Wait for DNS propagation (can take up to 48 hours)
+- Verify that the records are configured correctly in your DNS provider
+- Use `dig` or `nslookup` to verify the records manually
 
-### Email rifiutate in modalità enforce
-- Torna temporaneamente a modalità "testing"
-- Verifica i pattern MX specificati
-- Controlla i report TLS-RPT per dettagli sugli errori
-
+### Emails rejected in enforce mode
+- Temporarily switch back to "testing" mode
+- Verify the specified MX patterns
+- Check the TLS-RPT reports for error details

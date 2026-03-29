@@ -1,122 +1,122 @@
-# Setup completo MTA-STS per Postal
+# Complete MTA-STS Setup for Postal
 
-Questa guida ti aiuta a configurare completamente MTA-STS per i tuoi domini in Postal.
+This guide helps you fully configure MTA-STS for your domains in Postal.
 
-## Cos'è MTA-STS?
+## What is MTA-STS?
 
-MTA-STS (Mail Transfer Agent Strict Transport Security) è uno standard di sicurezza email che:
-- Forza l'uso di TLS per le connessioni email
-- Previene attacchi man-in-the-middle
-- Specifica quali mail server sono autorizzati per il dominio
+MTA-STS (Mail Transfer Agent Strict Transport Security) is an email security standard that:
+- Forces the use of TLS for email connections
+- Prevents man-in-the-middle attacks
+- Specifies which mail servers are authorized for the domain
 
-## Componenti necessari
+## Required Components
 
-### 1. Configurazione Rails ✅
-Già configurato in Postal:
-- Controller MTA-STS per servire le policy
-- Modello Domain con supporto MTA-STS
-- Route pubbliche per `/.well-known/mta-sts.txt`
+### 1. Rails Configuration ✅
+Already configured in Postal:
+- MTA-STS controller to serve policies
+- Domain model with MTA-STS support
+- Public routes for `/.well-known/mta-sts.txt`
 
 ### 2. DNS Records
-Devi configurare questi record DNS:
+You need to configure these DNS records:
 
 ```dns
-; Record MTA-STS (obbligatorio)
+; MTA-STS record (required)
 _mta-sts.example.com.  IN  TXT  "v=STSv1; id=<policy-id>"
 
-; A record per il sottodominio mta-sts (obbligatorio)
+; A record for the mta-sts subdomain (required)
 mta-sts.example.com.   IN  A    123.456.789.0
 
-; Record TLS-RPT (opzionale ma raccomandato)
+; TLS-RPT record (optional but recommended)
 _smtp._tls.example.com. IN TXT "v=TLSRPTv1; rua=mailto:tls-reports@example.com"
 ```
 
-### 3. Certificato SSL
-Hai bisogno di un certificato SSL valido per `mta-sts.example.com`
+### 3. SSL Certificate
+You need a valid SSL certificate for `mta-sts.example.com`
 
-**Opzione A: Certificato Wildcard** (raccomandato)
+**Option A: Wildcard Certificate** (recommended)
 ```bash
 certbot certonly --dns-cloudflare -d "*.example.com" -d "example.com"
 ```
 
-**Opzione B: Certificato specifico**
+**Option B: Specific Certificate**
 ```bash
 certbot certonly --nginx -d "mta-sts.example.com"
 ```
 
 ### 4. Reverse Proxy (Nginx)
-Configura nginx per servire l'endpoint MTA-STS pubblicamente.
+Configure nginx to serve the MTA-STS endpoint publicly.
 
-**IMPORTANTE:** L'endpoint `/.well-known/mta-sts.txt` **DEVE** essere pubblico (senza autenticazione).
+**IMPORTANT:** The `/.well-known/mta-sts.txt` endpoint **MUST** be public (no authentication).
 
-Vedi: `doc/MTA-STS-NGINX-CONFIG.md` per esempi di configurazione.
+See: `doc/MTA-STS-NGINX-CONFIG.md` for configuration examples.
 
-## Procedura di setup passo-passo
+## Step-by-Step Setup Procedure
 
-### Step 1: Abilita MTA-STS per il dominio in Postal
+### Step 1: Enable MTA-STS for the domain in Postal
 
-1. Accedi all'interfaccia web di Postal
-2. Vai al tuo server → Domains
-3. Seleziona il dominio
-4. Vai alla sezione "Security Settings"
-5. Abilita MTA-STS:
-   - **Enable MTA-STS:** Sì
-   - **Mode:** `testing` (per iniziare)
-   - **Max Age:** `86400` (24 ore)
-   - **MX Patterns:** Lascia vuoto per usare i default di Postal
+1. Log in to the Postal web interface
+2. Go to your server → Domains
+3. Select the domain
+4. Go to the "Security Settings" section
+5. Enable MTA-STS:
+   - **Enable MTA-STS:** Yes
+   - **Mode:** `testing` (to start)
+   - **Max Age:** `86400` (24 hours)
+   - **MX Patterns:** Leave empty to use Postal defaults
 
-### Step 2: Ottieni i valori DNS
+### Step 2: Get the DNS values
 
-Dopo aver abilitato MTA-STS, Postal ti mostrerà i record DNS da configurare:
+After enabling MTA-STS, Postal will show you the DNS records to configure:
 
 ```
 _mta-sts.example.com.  IN  TXT  "v=STSv1; id=abc123def456"
 ```
 
-Il `policy-id` (abc123def456) cambia automaticamente quando modifichi la configurazione MTA-STS.
+The `policy-id` (abc123def456) changes automatically when you modify the MTA-STS configuration.
 
-### Step 3: Configura il DNS
+### Step 3: Configure DNS
 
-Aggiungi i record DNS nel tuo provider:
+Add the DNS records in your provider:
 
-1. **Record _mta-sts (TXT):**
+1. **_mta-sts record (TXT):**
    - Name: `_mta-sts`
    - Type: `TXT`
-   - Value: `v=STSv1; id=<il-tuo-policy-id>`
+   - Value: `v=STSv1; id=<your-policy-id>`
 
-2. **Record mta-sts (A):**
+2. **mta-sts record (A):**
    - Name: `mta-sts`
    - Type: `A`
-   - Value: `<IP-del-tuo-server-postal>`
+   - Value: `<your-postal-server-IP>`
 
-3. **Record _smtp._tls (TXT) - Opzionale:**
+3. **_smtp._tls record (TXT) - Optional:**
    - Name: `_smtp._tls`
    - Type: `TXT`
    - Value: `v=TLSRPTv1; rua=mailto:tls-reports@example.com`
 
-Attendi la propagazione DNS (può richiedere fino a 24-48 ore).
+Wait for DNS propagation (can take up to 24-48 hours).
 
-### Step 4: Configura Nginx
+### Step 4: Configure Nginx
 
-**Se non hai Nginx configurato**, segui `doc/MTA-STS-NGINX-CONFIG.md`
+**If you don't have Nginx configured**, follow `doc/MTA-STS-NGINX-CONFIG.md`
 
-**Se hai già Nginx**, assicurati che:
-1. Ci sia un server block per `mta-sts.*`
-2. Certificato SSL valido
-3. L'endpoint `/.well-known/mta-sts.txt` sia **pubblico** (senza auth_basic)
+**If you already have Nginx**, make sure that:
+1. There is a server block for `mta-sts.*`
+2. Valid SSL certificate
+3. The `/.well-known/mta-sts.txt` endpoint is **public** (no auth_basic)
 
-Configurazione minima:
+Minimal configuration:
 
 ```nginx
 server {
     listen 443 ssl http2;
     server_name mta-sts.*;
-    
+
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
-    
+
     location = /.well-known/mta-sts.txt {
-        auth_basic off;  # Nessuna autenticazione!
+        auth_basic off;  # No authentication!
         proxy_pass http://postal:5000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -124,30 +124,30 @@ server {
 }
 ```
 
-Ricarica nginx:
+Reload nginx:
 ```bash
 nginx -t && systemctl reload nginx
 ```
 
-### Step 5: Verifica la configurazione
+### Step 5: Verify the configuration
 
-#### 5.1 Test DNS
+#### 5.1 DNS Test
 ```bash
-# Verifica record MTA-STS
+# Verify MTA-STS record
 dig +short TXT _mta-sts.example.com
-# Output atteso: "v=STSv1; id=abc123def456"
+# Expected output: "v=STSv1; id=abc123def456"
 
-# Verifica A record
+# Verify A record
 dig +short mta-sts.example.com
-# Output atteso: 123.456.789.0
+# Expected output: 123.456.789.0
 ```
 
-#### 5.2 Test HTTPS
+#### 5.2 HTTPS Test
 ```bash
-# Test endpoint MTA-STS
+# Test MTA-STS endpoint
 curl -v https://mta-sts.example.com/.well-known/mta-sts.txt
 
-# Output atteso:
+# Expected output:
 # HTTP/2 200
 # content-type: text/plain; charset=utf-8
 #
@@ -157,90 +157,90 @@ curl -v https://mta-sts.example.com/.well-known/mta-sts.txt
 # max_age: 86400
 ```
 
-#### 5.3 Test da Postal UI
-1. Vai a Domains → Il tuo dominio → Security Settings
-2. Clicca "Check MTA-STS Policy"
-3. Dovresti vedere: ✅ "Policy file is accessible and valid"
+#### 5.3 Test from Postal UI
+1. Go to Domains → Your domain → Security Settings
+2. Click "Check MTA-STS Policy"
+3. You should see: ✅ "Policy file is accessible and valid"
 
-**Se ricevi errore 403**, vedi `doc/MTA-STS-TROUBLESHOOTING-403.md`
+**If you receive a 403 error**, see `doc/MTA-STS-TROUBLESHOOTING-403.md`
 
-### Step 6: Passa a mode "enforce"
+### Step 6: Switch to "enforce" mode
 
-Dopo aver verificato che tutto funzioni in modalità "testing" per almeno 1-2 settimane:
+After verifying that everything works in "testing" mode for at least 1-2 weeks:
 
-1. Vai su Postal UI → Domains → Security Settings
-2. Cambia **Mode** da `testing` a `enforce`
-3. Salva
-4. Il `policy-id` DNS cambierà automaticamente
-5. Aggiorna il record DNS `_mta-sts` con il nuovo ID
+1. Go to Postal UI → Domains → Security Settings
+2. Change **Mode** from `testing` to `enforce`
+3. Save
+4. The DNS `policy-id` will change automatically
+5. Update the `_mta-sts` DNS record with the new ID
 
-## Testing con strumenti esterni
+## Testing with External Tools
 
-### MTA-STS Validator online
+### Online MTA-STS Validator
 ```
 https://aykevl.nl/apps/mta-sts/
 ```
 
-Inserisci il tuo dominio per verificare:
-- Record DNS _mta-sts
-- Policy file accessibilità
-- Certificato SSL
-- Validità della policy
+Enter your domain to verify:
+- _mta-sts DNS record
+- Policy file accessibility
+- SSL certificate
+- Policy validity
 
 ### Google Postmaster Tools
-Se invii email a Gmail, monitora i report TLS in:
+If you send emails to Gmail, monitor TLS reports at:
 ```
 https://postmaster.google.com/
 ```
 
-## Modalità MTA-STS
+## MTA-STS Modes
 
-### Testing (raccomandato per iniziare)
+### Testing (recommended to start)
 ```
 mode: testing
 ```
-- I mail server verificano la policy ma **non** bloccano le email se fallisce
-- Usato per testare la configurazione
-- I report TLS mostrano eventuali problemi
-- **Raccomandato per le prime 1-2 settimane**
+- Mail servers verify the policy but **do not** block emails if it fails
+- Used to test the configuration
+- TLS reports show any issues
+- **Recommended for the first 1-2 weeks**
 
-### Enforce (produzione)
+### Enforce (production)
 ```
 mode: enforce
 ```
-- I mail server **devono** rispettare la policy
-- Le email vengono rifiutate se la consegna sicura fallisce
-- Usa solo dopo aver testato con `testing`
+- Mail servers **must** respect the policy
+- Emails are rejected if secure delivery fails
+- Only use after testing with `testing`
 
-### None (disabilitato)
+### None (disabled)
 ```
 mode: none
 ```
-- Policy pubblicata ma non applicata
-- Equivalente a MTA-STS disabilitato
+- Policy published but not enforced
+- Equivalent to MTA-STS disabled
 
 ## Max Age
 
-Raccomandazioni:
+Recommendations:
 
-| Modalità | Max Age | Descrizione |
-|----------|---------|-------------|
-| Testing  | 86400 (1 giorno) | Per testing iniziale |
-| Enforce  | 604800 (7 giorni) | Per produzione stabile |
-| Enforce  | 31536000 (1 anno) | Per configurazioni molto stabili |
+| Mode | Max Age | Description |
+|------|---------|-------------|
+| Testing  | 86400 (1 day) | For initial testing |
+| Enforce  | 604800 (7 days) | For stable production |
+| Enforce  | 31536000 (1 year) | For very stable configurations |
 
-**Attenzione:** Un max_age alto significa che i mail server cacheranno la policy più a lungo. Se devi fare modifiche, potrebbero volerci giorni/settimane prima che tutti i server aggiornino.
+**Warning:** A high max_age means mail servers will cache the policy for longer. If you need to make changes, it may take days/weeks before all servers update.
 
 ## MX Patterns
 
-### Default (lascia vuoto)
-Postal usa automaticamente i suoi MX server configurati in `config/postal.yml`:
+### Default (leave empty)
+Postal automatically uses its configured MX servers from `config/postal.yml`:
 ```
 mx: *.mx.postal.example.com
 ```
 
 ### Custom
-Puoi specificare pattern personalizzati (uno per riga):
+You can specify custom patterns (one per line):
 ```
 *.mx1.example.com
 *.mx2.example.com
@@ -249,68 +249,67 @@ mail.example.com
 
 ## Troubleshooting
 
-### Problema: HTTP 403 quando verifico la policy
-**Soluzione:** Vedi `doc/MTA-STS-TROUBLESHOOTING-403.md`
+### Problem: HTTP 403 when verifying the policy
+**Solution:** See `doc/MTA-STS-TROUBLESHOOTING-403.md`
 
-### Problema: DNS non si propaga
+### Problem: DNS is not propagating
 ```bash
-# Forza refresh DNS
+# Force DNS refresh
 dig @8.8.8.8 +short TXT _mta-sts.example.com
 ```
 
-### Problema: Certificato SSL non valido
+### Problem: Invalid SSL certificate
 ```bash
-# Verifica certificato
+# Verify certificate
 openssl s_client -connect mta-sts.example.com:443 \
   -servername mta-sts.example.com | grep -A 2 "Verify return code"
 ```
 
-### Problema: La policy non viene servita
+### Problem: The policy is not being served
 ```bash
-# Test locale (bypassa nginx)
+# Local test (bypass nginx)
 ruby script/test_mta_sts_endpoint.rb example.com
 ```
 
 ## Monitoring
 
-### Log Rails
+### Rails Logs
 ```bash
 tail -f log/production.log | grep -i mta-sts
 ```
 
-Output normale:
+Normal output:
 ```
 MTA-STS policy request - Host: mta-sts.example.com, Extracted domain: example.com
 MTA-STS policy served successfully for domain: example.com
 ```
 
 ### TLS-RPT Reports
-Se hai configurato TLS-RPT, riceverai email giornaliere con statistiche:
-- Numero di connessioni TLS riuscite
-- Fallimenti di validazione certificati
-- Altri problemi di connessione
+If you have configured TLS-RPT, you will receive daily emails with statistics:
+- Number of successful TLS connections
+- Certificate validation failures
+- Other connection issues
 
-## Sicurezza
+## Security
 
 ### Best Practices
-1. ✅ Usa sempre certificati SSL validi (Let's Encrypt va bene)
-2. ✅ Inizia con mode `testing`, passa a `enforce` dopo test
-3. ✅ Monitora i report TLS-RPT per identificare problemi
-4. ✅ Usa max_age conservativi (1 settimana) finché non sei sicuro
-5. ✅ Non pubblicare mai credenziali nei MX patterns
+1. ✅ Always use valid SSL certificates (Let's Encrypt is fine)
+2. ✅ Start with `testing` mode, switch to `enforce` after testing
+3. ✅ Monitor TLS-RPT reports to identify issues
+4. ✅ Use conservative max_age values (1 week) until you are confident
+5. ✅ Never publish credentials in MX patterns
 
-### Cosa NON fare
-1. ❌ Non usare `enforce` senza testare prima con `testing`
-2. ❌ Non usare max_age molto alti (>1 anno) se la tua infra cambia spesso
-3. ❌ Non dimenticare di aggiornare il DNS quando cambi la policy
-4. ❌ Non usare certificati self-signed in produzione
-5. ❌ Non proteggere `/.well-known/mta-sts.txt` con autenticazione
+### What NOT to Do
+1. ❌ Don't use `enforce` without testing with `testing` first
+2. ❌ Don't use very high max_age values (>1 year) if your infrastructure changes often
+3. ❌ Don't forget to update DNS when you change the policy
+4. ❌ Don't use self-signed certificates in production
+5. ❌ Don't protect `/.well-known/mta-sts.txt` with authentication
 
-## Riferimenti
+## References
 
 - [RFC 8461 - MTA-STS](https://tools.ietf.org/html/rfc8461)
 - [RFC 8460 - TLS-RPT](https://tools.ietf.org/html/rfc8460)
-- [Documentazione implementazione Postal](doc/MTA-STS-IMPLEMENTATION-SUMMARY.md)
-- [Configurazione Nginx](doc/MTA-STS-NGINX-CONFIG.md)
+- [Postal Implementation Documentation](doc/MTA-STS-IMPLEMENTATION-SUMMARY.md)
+- [Nginx Configuration](doc/MTA-STS-NGINX-CONFIG.md)
 - [Troubleshooting 403](doc/MTA-STS-TROUBLESHOOTING-403.md)
-

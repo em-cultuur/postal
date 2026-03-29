@@ -9,8 +9,8 @@ module Postal
     class Truemail < MessageInspector
 
       def inspect_message(inspection)
-        # Truemail valida gli indirizzi email, non il contenuto del messaggio
-        # Estraiamo l'indirizzo To dal messaggio
+        # Truemail validates email addresses, not message content
+        # We extract the To address from the message
         message = inspection.message
         to_address = extract_to_address(message)
 
@@ -44,11 +44,11 @@ module Postal
       private
 
       def extract_to_address(message)
-        # Estrae l'indirizzo To dal messaggio
+        # Extracts the To address from the message
         if message.respond_to?(:to)
           message.to&.first
         elsif message.respond_to?(:raw_message)
-          # Parsing manuale dell'header To dal raw message
+          # Manual parsing of the To header from the raw message
           raw = message.raw_message
           if raw =~ /^To:\s*(.+)$/mi
             $1.strip

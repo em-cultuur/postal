@@ -9,7 +9,7 @@ class MtaStsController < ApplicationController
   skip_before_action :set_timezone
 
   # GET /.well-known/mta-sts.txt
-  # Serve la policy MTA-STS per il dominio richiesto
+  # Serves the MTA-STS policy for the requested domain
   def policy
     domain_name = extract_domain_from_host
 
@@ -21,9 +21,9 @@ class MtaStsController < ApplicationController
       return
     end
 
-    # Cerca il dominio nel database
-    # Il dominio deve essere verificato e avere MTA-STS abilitato
-    # La ricerca è case-insensitive per il nome del dominio
+    # Search for the domain in the database
+    # The domain must be verified and have MTA-STS enabled
+    # The search is case-insensitive for the domain name
     domain = Domain.verified.where(mta_sts_enabled: true)
                      .where("LOWER(name) = ?", domain_name.downcase)
                      .first
@@ -42,7 +42,7 @@ class MtaStsController < ApplicationController
       return
     end
 
-    # Serve la policy come plain text
+    # Serve the policy as plain text
     response.headers["Content-Type"] = "text/plain; charset=utf-8"
     response.headers["Cache-Control"] = "max-age=#{domain.mta_sts_max_age || 86400}"
 
@@ -55,8 +55,8 @@ class MtaStsController < ApplicationController
   def extract_domain_from_host
     host = request.host
 
-    # Rimuove il prefisso mta-sts. se presente
-    # es: mta-sts.example.com -> example.com
+    # Removes the mta-sts. prefix if present
+    # e.g.: mta-sts.example.com -> example.com
     if host.start_with?("mta-sts.")
       host.sub(/\Amta-sts\./, "")
     else

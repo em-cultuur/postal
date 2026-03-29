@@ -1,68 +1,68 @@
 # Copilot Instructions
 
-## Contesto del progetto
+## Project Context
 
-Questo è un progetto Ruby on Rails per un servizio di mail/email con funzionalità avanzate di routing, tracking e webhook.
+This is a Ruby on Rails project for a mail/email service with advanced routing, tracking, and webhook functionality.
 
-## Linee guida generali
+## General Guidelines
 
-- Segui le best practice di Ruby on Rails 7.0
-- Utilizza ActiveRecord per l'accesso al database
-- **NON modificare mai direttamente il file `db/schema.rb`** - usa sempre le migration
-- Scrivi test automatici per ogni nuova funzionalità
-- Mantieni il codice pulito e ben documentato
-- Rispetta le convenzioni di naming Rails per modelli, controller e viste
-- Assicurati che tutte le query siano sicure da SQL injection
+- Follow Ruby on Rails 7.0 best practices
+- Use ActiveRecord for database access
+- **NEVER modify the `db/schema.rb` file directly** - always use migrations
+- Write automated tests for every new feature
+- Keep the code clean and well documented
+- Follow Rails naming conventions for models, controllers, and views
+- Ensure all queries are safe from SQL injection
 
-## Struttura del database
+## Database Structure
 
-- **Charset**: `utf8mb4` con collation `utf8mb4_general_ci` per tutte le tabelle
-- **Primary Keys**: Utilizza `:integer` come tipo per gli ID
-- **UUIDs**: Molte entità utilizzano campi `uuid` per identificatori esterni
-- **Timestamps**: Usa `precision: nil` per mantenere compatibilità
+- **Charset**: `utf8mb4` with collation `utf8mb4_general_ci` for all tables
+- **Primary Keys**: Use `:integer` as the type for IDs
+- **UUIDs**: Many entities use `uuid` fields for external identifiers
+- **Timestamps**: Use `precision: nil` to maintain compatibility
 
-## Entità principali
+## Main Entities
 
-- **Organizations**: Organizzazioni con utenti e server
-- **Servers**: Server di posta con modalità e limiti di invio
-- **Domains**: Domini verificati con controlli DNS/DKIM/SPF
-- **Routes**: Routing dei messaggi verso endpoint
-- **Endpoints**: HTTP, SMTP e Address endpoints per delivery
-- **Messages**: Sistema di code per messaggi (`queued_messages`)
-- **Webhooks**: Sistema di notifiche con retry automatico
-- **Users**: Autenticazione con Authie sessions
+- **Organizations**: Organizations with users and servers
+- **Servers**: Mail servers with modes and sending limits
+- **Domains**: Verified domains with DNS/DKIM/SPF checks
+- **Routes**: Message routing to endpoints
+- **Endpoints**: HTTP, SMTP, and Address endpoints for delivery
+- **Messages**: Message queue system (`queued_messages`)
+- **Webhooks**: Notification system with automatic retry
+- **Users**: Authentication with Authie sessions
 
-## Best practices specifiche
+## Specific Best Practices
 
-- Usa sempre indici sui campi `uuid` con lunghezza limitata (es. `length: 8`)
-- Per i campi di stato usa enum o stringhe con validazioni
-- Implementa soft delete con campi `deleted_at` dove appropriato
-- Gestisci retry e locking per sistemi asincroni (`locked_by`, `locked_at`)
-- Usa `decimal` per soglie e percentuali con precisione definita
-- Includi sempre timestamp per audit trail
-- Per servizi esterni (SpamAssassin, ClamAV, Truemail) usa timeout e gestione errori robusta
+- Always use indexes on `uuid` fields with limited length (e.g., `length: 8`)
+- For status fields use enums or strings with validations
+- Implement soft delete with `deleted_at` fields where appropriate
+- Handle retry and locking for asynchronous systems (`locked_by`, `locked_at`)
+- Use `decimal` for thresholds and percentages with defined precision
+- Always include timestamps for audit trail
+- For external services (SpamAssassin, ClamAV, Truemail) use robust timeout and error handling
 
-## Sicurezza
+## Security
 
-- Non includere mai credenziali in chiaro nel codice
-- Usa token hash per autenticazione (`token_hash` vs `token`)
-- Implementa rate limiting e soglie spam
-- Valida sempre input da webhook e API esterne
+- Never include plaintext credentials in the code
+- Use token hashing for authentication (`token_hash` vs `token`)
+- Implement rate limiting and spam thresholds
+- Always validate input from webhooks and external APIs
 
 ## Performance
 
-- Usa indici appropriati per query frequenti
-- Implementa paginazione per liste lunghe
-- Considera il caching per dati di configurazione
-- Monitora query N+1 con includes/joins
+- Use appropriate indexes for frequent queries
+- Implement pagination for long lists
+- Consider caching for configuration data
+- Monitor N+1 queries with includes/joins
 
-## Integrazione Truemail
+## Truemail Integration
 
-Prompt: aggiungi la fase di sviluppo per integrare le funzionalità di truemail. L'integrazione deve avvennire come avviene per spamassassin (spamd) e clamav, quindi devi aggiungere la configurazione per abilitarlo e configurarlo. La modalità di integrazione di truemail è tramite API che verranno esposte da truemail-rack deploiato in un container docker a parte, la documentazione dell'endpoint è qui: https://truemail-rb.org/truemail-rack/#/endpoints . Inoltre, in ogni singolo mail server si potrà configurare se abilitare o meno la verifica dell'indirizzo prima dell'invio mail
+Prompt: add the development phase to integrate Truemail functionality. The integration should follow the same pattern as SpamAssassin (spamd) and ClamAV, so you need to add configuration to enable and configure it. Truemail integration is via API exposed by truemail-rack deployed in a separate Docker container. The endpoint documentation is here: https://truemail-rb.org/truemail-rack/#/endpoints. Additionally, each individual mail server should be configurable to enable or disable address verification before sending mail.
 
-## Fase di sviluppo per l'integrazione di Truemail
-- Configurazione globale: Aggiungere le impostazioni Truemail al sistema di configurazione principale
-- Configurazione per server: Estendere il modello Server per permettere l'abilitazione per singolo server
-- Client API: Creare un client per comunicare con l'API Truemail
-- Integrazione nella pipeline: Aggiungere la validazione prima dell'invio mail
-- Interface web: Aggiungere controlli nell'interfaccia di amministrazione
+## Development Phase for Truemail Integration
+- Global configuration: Add Truemail settings to the main configuration system
+- Per-server configuration: Extend the Server model to allow enabling on a per-server basis
+- API Client: Create a client to communicate with the Truemail API
+- Pipeline integration: Add validation before sending mail
+- Web interface: Add controls in the administration interface

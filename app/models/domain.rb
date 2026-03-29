@@ -193,8 +193,8 @@ class Domain < ApplicationRecord
   end
 
   def mta_sts_policy_id
-    # Genera un ID univoco basato sulla configurazione corrente
-    # Cambia ogni volta che la policy viene modificata
+    # Generates a unique ID based on the current configuration
+    # Changes every time the policy is modified
     data = "#{mta_sts_mode}:#{mta_sts_max_age}:#{mta_sts_mx_patterns}:#{updated_at.to_i}"
     Digest::SHA256.hexdigest(data)[0..19]
   end

@@ -1,12 +1,12 @@
-# Domain Throttling - Gestione Rate Limiting SMTP
+# Domain Throttling - SMTP Rate Limiting Management
 
-## Panoramica
+## Overview
 
-Il sistema di Domain Throttling gestisce automaticamente il rate limiting quando un server SMTP destinatario risponde con un errore 451 "too many messages, slow down". Invece di ritentare immediatamente l'invio (causando potenzialmente ulteriori rifiuti e danni alla reputazione IP), il sistema rallenta intelligentemente l'invio per tutti i messaggi destinati allo stesso dominio.
+The Domain Throttling system automatically manages rate limiting when a destination SMTP server responds with a 451 "too many messages, slow down" error. Instead of immediately retrying the send (potentially causing further rejections and IP reputation damage), the system intelligently slows down sending for all messages destined for the same domain.
 
-## Problema Risolto
+## Problem Solved
 
-Quando si invia un grande volume di email a un singolo dominio, il server destinatario può rispondere con:
+When sending a large volume of emails to a single domain, the destination server may respond with:
 
 ```
 451 4.7.1 Too many messages, slow down
@@ -14,21 +14,21 @@ Quando si invia un grande volume di email a un singolo dominio, il server destin
 451 Too many connections from your IP
 ```
 
-Senza gestione del throttling:
-- ❌ Ogni messaggio viene ritentato individualmente
-- ❌ I retry multipli peggiorano la situazione
-- ❌ Rischio di blacklisting dell'IP
-- ❌ Spreco di risorse
+Without throttling management:
+- ❌ Each message is retried individually
+- ❌ Multiple retries worsen the situation
+- ❌ Risk of IP blacklisting
+- ❌ Resource waste
 
-Con Domain Throttling:
-- ✅ Un solo messaggio riceve l'errore 451
-- ✅ Tutti i messaggi per lo stesso dominio vengono ritardati
-- ✅ La reputazione IP viene preservata
-- ✅ Efficienza delle risorse migliorata
+With Domain Throttling:
+- ✅ Only one message receives the 451 error
+- ✅ All messages for the same domain are delayed
+- ✅ IP reputation is preserved
+- ✅ Improved resource efficiency
 
-## Architettura
+## Architecture
 
-### Componenti
+### Components
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -36,7 +36,7 @@ Con Domain Throttling:
 │  ┌─────────────────────┐    ┌──────────────────────────────┐   │
 │  │ skip_if_domain_     │    │ apply_domain_throttle_       │   │
 │  │ throttled           │    │ if_required                  │   │
-│  │ (prima dell'invio)  │    │ (dopo errore 451)            │   │
+│  │ (before sending)    │    │ (after 451 error)            │   │
 │  └──────────┬──────────┘    └──────────────┬───────────────┘   │
 └─────────────┼───────────────────────────────┼───────────────────┘
               │                               │
@@ -60,243 +60,243 @@ Con Domain Throttling:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Flusso di Esecuzione
+### Execution Flow
 
 ```
-1. Messaggio in coda
+1. Message in queue
         │
         ▼
-2. Processor acquisisce lock
+2. Processor acquires lock
         │
         ▼
-3. Check: dominio in throttle? ──YES──► Imposta retry_after, rilascia lock
+3. Check: domain throttled? ──YES──► Set retry_after, release lock
         │
         NO
         ▼
-4. Procede con invio SMTP
+4. Proceed with SMTP send
         │
         ▼
-5. Risposta dal server destinatario
+5. Response from destination server
         │
    ┌────┴────┐
    │         │
- Successo   Errore 451
+ Success   451 Error
    │         │
    ▼         ▼
-6. Fine    Crea DomainThrottle
-           Aggiorna tutti i queued_messages 
-           per lo stesso dominio
-           Imposta retry_after
+6. Done    Create DomainThrottle
+           Update all queued_messages
+           for the same domain
+           Set retry_after
 ```
 
-## Struttura Database
+## Database Structure
 
-### Tabella: domain_throttles
+### Table: domain_throttles
 
-| Campo | Tipo | Descrizione |
+| Field | Type | Description |
 |-------|------|-------------|
 | `id` | integer | Primary key |
-| `server_id` | integer | FK verso servers (throttle per-server) |
-| `domain` | string | Dominio destinatario (normalizzato lowercase) |
-| `throttled_until` | datetime | Timestamp fino a quando il dominio è in throttle |
-| `reason` | string | Messaggio di errore originale del server SMTP |
-| `created_at` | datetime | Timestamp creazione |
-| `updated_at` | datetime | Timestamp ultimo aggiornamento |
+| `server_id` | integer | FK to servers (per-server throttle) |
+| `domain` | string | Destination domain (normalized lowercase) |
+| `throttled_until` | datetime | Timestamp until the domain is throttled |
+| `reason` | string | Original SMTP server error message |
+| `created_at` | datetime | Creation timestamp |
+| `updated_at` | datetime | Last update timestamp |
 
-**Indici:**
-- `UNIQUE (server_id, domain)` - Un solo throttle per dominio per server
-- `INDEX (throttled_until)` - Per query di pulizia efficienti
+**Indexes:**
+- `UNIQUE (server_id, domain)` - One throttle per domain per server
+- `INDEX (throttled_until)` - For efficient cleanup queries
 
-## Configurazione
+## Configuration
 
-### Costanti (DomainThrottle)
+### Constants (DomainThrottle)
 
 ```ruby
-# Durata default del throttle (5 minuti)
+# Default throttle duration (5 minutes)
 DEFAULT_THROTTLE_DURATION = 300
 
-# Durata massima del throttle (30 minuti)
+# Maximum throttle duration (30 minutes)
 MAX_THROTTLE_DURATION = 1800
 ```
 
-### Pattern di Rilevamento
+### Detection Patterns
 
-Il sistema rileva automaticamente i seguenti pattern negli errori SMTP:
+The system automatically detects the following patterns in SMTP errors:
 
 - `451 ... too many` / `too many messages` / `too many connections`
 - `rate limit` / `rate limited`
 - `slow down`
-- `temporarily deferred` / `temporarily rejected` con menzione di rate/limit
+- `temporarily deferred` / `temporarily rejected` with mention of rate/limit
 
-### Estrazione Durata
+### Duration Extraction
 
-Se il messaggio di errore contiene un tempo specifico, viene estratto:
+If the error message contains a specific time, it is extracted:
 
 ```
-"Try again in 30 seconds" → 40 secondi (30 + 10 buffer)
-"Retry in 5 minutes" → 310 secondi (5*60 + 10 buffer)
-"Try again in 2 hours" → 1800 secondi (capped a MAX)
+"Try again in 30 seconds" → 40 seconds (30 + 10 buffer)
+"Retry in 5 minutes" → 310 seconds (5*60 + 10 buffer)
+"Try again in 2 hours" → 1800 seconds (capped at MAX)
 ```
 
-## API del Modello DomainThrottle
+## DomainThrottle Model API
 
-### Metodi di Classe
+### Class Methods
 
 ```ruby
-# Verifica se un dominio è in throttle
+# Check if a domain is throttled
 DomainThrottle.throttled?(server, "gmail.com")
-# => DomainThrottle instance o nil
+# => DomainThrottle instance or nil
 
-# Applica/estende un throttle
+# Apply/extend a throttle
 DomainThrottle.apply(
-  server, 
+  server,
   "gmail.com",
-  duration: 300,           # opzionale, default 300
-  reason: "451 too many"   # opzionale
+  duration: 300,           # optional, default 300
+  reason: "451 too many"   # optional
 )
 # => DomainThrottle instance
 
-# Pulisce i throttle scaduti
+# Clean up expired throttles
 DomainThrottle.cleanup_expired
-# => numero di record eliminati
+# => number of deleted records
 ```
 
 ### Scopes
 
 ```ruby
-# Throttle attivi
+# Active throttles
 DomainThrottle.active
 
-# Throttle scaduti
+# Expired throttles
 DomainThrottle.expired
 ```
 
-### Metodi di Istanza
+### Instance Methods
 
 ```ruby
 throttle.active?           # => true/false
-throttle.remaining_seconds # => Integer (secondi rimanenti)
+throttle.remaining_seconds # => Integer (remaining seconds)
 ```
 
 ## Scheduled Task
 
-Il task `PruneDomainThrottlesScheduledTask` viene eseguito ogni **15 minuti** per rimuovere i record di throttle scaduti dal database.
+The `PruneDomainThrottlesScheduledTask` task runs every **15 minutes** to remove expired throttle records from the database.
 
-## Granularità
+## Granularity
 
-Il throttling è applicato **per-server**, il che significa che:
+Throttling is applied **per-server**, which means that:
 
-- Se il Server A riceve un 451 da `gmail.com`, solo i messaggi del Server A verso `gmail.com` vengono ritardati
-- Il Server B può continuare a inviare a `gmail.com` normalmente
-- Questo evita che un server sovraccarico impatti altri server nell'installazione
+- If Server A receives a 451 from `gmail.com`, only Server A's messages to `gmail.com` are delayed
+- Server B can continue sending to `gmail.com` normally
+- This prevents an overloaded server from impacting other servers in the installation
 
-## Comportamento Batch
+## Batch Behavior
 
-Quando viene rilevato un errore 451:
+When a 451 error is detected:
 
-1. Viene creato/aggiornato il `DomainThrottle` per il dominio
-2. **Tutti** i `queued_messages` dello stesso server con lo stesso dominio vengono aggiornati in batch con `retry_after`
-3. Questo previene che altri worker tentino di inviare mentre il dominio è in throttle
+1. The `DomainThrottle` for the domain is created/updated
+2. **All** `queued_messages` from the same server with the same domain are updated in batch with `retry_after`
+3. This prevents other workers from attempting to send while the domain is throttled
 
 ```ruby
-# Query di aggiornamento batch
+# Batch update query
 QueuedMessage.where(server_id: server_id, domain: domain)
              .where("retry_after IS NULL OR retry_after < ?", throttled_until)
              .update_all(retry_after: throttled_until + 10.seconds)
 ```
 
-## Backoff Esponenziale
+## Exponential Backoff
 
-Se un dominio riceve ripetuti errori 451, la durata del throttle aumenta progressivamente:
+If a domain receives repeated 451 errors, the throttle duration increases progressively:
 
-1. Primo 451: 5 minuti
-2. Secondo 451 (mentre ancora in throttle): tempo rimanente × 2 (max 30 minuti)
+1. First 451: 5 minutes
+2. Second 451 (while still throttled): remaining time × 2 (max 30 minutes)
 
-Questo aiuta a gestire situazioni in cui il server destinatario ha bisogno di più tempo per recuperare.
+This helps manage situations where the destination server needs more time to recover.
 
-## Esempi di Utilizzo
+## Usage Examples
 
-### Verifica Manuale dello Stato
+### Manual Status Check
 
 ```ruby
 # In Rails console
 server = Server.find(1)
 
-# Verifica throttle attivi
+# Check active throttles
 server.domain_throttles.active
 
-# Verifica se un dominio specifico è in throttle
+# Check if a specific domain is throttled
 DomainThrottle.throttled?(server, "gmail.com")
 
-# Rimuovi manualmente un throttle
+# Manually remove a throttle
 DomainThrottle.find_by(server: server, domain: "gmail.com")&.destroy
 ```
 
-### Monitoraggio
+### Monitoring
 
 ```ruby
-# Conteggio throttle attivi per server
+# Active throttle count per server
 Server.all.each do |s|
   count = s.domain_throttles.active.count
-  puts "#{s.name}: #{count} domini in throttle" if count > 0
+  puts "#{s.name}: #{count} domains throttled" if count > 0
 end
 
-# Domini più frequentemente in throttle
+# Most frequently throttled domains
 DomainThrottle.group(:domain)
               .order('count_id DESC')
               .count(:id)
               .first(10)
 ```
 
-## File Implementati
+## Implemented Files
 
-| File | Descrizione |
+| File | Description |
 |------|-------------|
-| `db/migrate/20251210000001_create_domain_throttles.rb` | Migration database |
-| `app/models/domain_throttle.rb` | Modello ActiveRecord |
-| `app/models/server.rb` | Aggiunta associazione `has_many :domain_throttles` |
-| `app/senders/send_result.rb` | Nuovi attributi throttle |
-| `app/senders/smtp_sender.rb` | Rilevamento errori 451 |
-| `app/lib/message_dequeuer/outgoing_message_processor.rb` | Logica di throttling |
-| `app/scheduled_tasks/prune_domain_throttles_scheduled_task.rb` | Pulizia periodica |
-| `app/controllers/messages_controller.rb` | Actions per UI (`throttled_domains`, `remove_throttled_domain`) |
-| `app/views/messages/throttled_domains.html.haml` | Vista lista domini in throttle |
-| `app/views/messages/_header.html.haml` | Link nel menu di navigazione |
-| `config/routes.rb` | Routes per le nuove pagine |
+| `db/migrate/20251210000001_create_domain_throttles.rb` | Database migration |
+| `app/models/domain_throttle.rb` | ActiveRecord model |
+| `app/models/server.rb` | Added `has_many :domain_throttles` association |
+| `app/senders/send_result.rb` | New throttle attributes |
+| `app/senders/smtp_sender.rb` | 451 error detection |
+| `app/lib/message_dequeuer/outgoing_message_processor.rb` | Throttling logic |
+| `app/scheduled_tasks/prune_domain_throttles_scheduled_task.rb` | Periodic cleanup |
+| `app/controllers/messages_controller.rb` | UI actions (`throttled_domains`, `remove_throttled_domain`) |
+| `app/views/messages/throttled_domains.html.haml` | Throttled domains list view |
+| `app/views/messages/_header.html.haml` | Navigation menu link |
+| `config/routes.rb` | Routes for the new pages |
 
-## Interfaccia Web
+## Web Interface
 
-### Accesso
+### Access
 
-La pagina "Throttled Domains" è accessibile dalla sezione **Messages** di ogni server:
+The "Throttled Domains" page is accessible from the **Messages** section of each server:
 
 ```
 Organization → Server → Messages → Throttled Domains
 ```
 
-### Funzionalità
+### Features
 
-La pagina mostra una tabella con:
+The page shows a table with:
 
-| Colonna | Descrizione |
-|---------|-------------|
-| **Domain** | Il dominio destinatario in throttle |
-| **Throttled Until** | Data e ora di scadenza del throttle |
-| **Time Remaining** | Tempo rimanente in formato leggibile (es. "4m 30s") |
-| **Reason** | Il messaggio di errore originale del server SMTP |
-| **Actions** | Pulsante per rimuovere manualmente il throttle |
+| Column | Description |
+|--------|-------------|
+| **Domain** | The destination domain being throttled |
+| **Throttled Until** | Throttle expiration date and time |
+| **Time Remaining** | Remaining time in human-readable format (e.g., "4m 30s") |
+| **Reason** | The original SMTP server error message |
+| **Actions** | Button to manually remove the throttle |
 
-### Rimozione Manuale
+### Manual Removal
 
-È possibile rimuovere un throttle manualmente cliccando il pulsante "Remove". Questo è utile quando:
+You can manually remove a throttle by clicking the "Remove" button. This is useful when:
 
-- Il problema sul server remoto è stato risolto
-- Si vuole forzare un nuovo tentativo di invio
-- Il throttle è stato applicato erroneamente
+- The problem on the remote server has been resolved
+- You want to force a new send attempt
+- The throttle was applied incorrectly
 
-**Attenzione:** Rimuovere un throttle farà sì che i messaggi in coda vengano inviati immediatamente. Se il server remoto sta ancora limitando il rate, potrebbe risultare in ulteriori errori 451.
+**Warning:** Removing a throttle will cause queued messages to be sent immediately. If the remote server is still rate limiting, this could result in additional 451 errors.
 
-### Screenshot Concettuale
+### Conceptual Screenshot
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -317,15 +317,15 @@ La pagina mostra una tabella con:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Test
+## Tests
 
-I test sono disponibili in:
+Tests are available in:
 
-- `spec/models/domain_throttle_spec.rb` - Test del modello
-- `spec/scheduled_tasks/prune_domain_throttles_scheduled_task_spec.rb` - Test scheduled task
-- `spec/senders/smtp_sender_spec.rb` - Test rilevamento throttle
+- `spec/models/domain_throttle_spec.rb` - Model tests
+- `spec/scheduled_tasks/prune_domain_throttles_scheduled_task_spec.rb` - Scheduled task tests
+- `spec/senders/smtp_sender_spec.rb` - Throttle detection tests
 
-Eseguire i test:
+Run the tests:
 
 ```bash
 bundle exec rspec spec/models/domain_throttle_spec.rb \
@@ -333,19 +333,18 @@ bundle exec rspec spec/models/domain_throttle_spec.rb \
                   spec/senders/smtp_sender_spec.rb
 ```
 
-## Migrazione
+## Migration
 
-Per attivare la funzionalità:
+To activate the feature:
 
 ```bash
 bundle exec rails db:migrate
 ```
 
-Su Percona XtraDB Cluster, eseguire la migrazione su un singolo nodo per evitare problemi di lock.
-E' necessario lanciare temporanemente il seguente comando SQL:
+On Percona XtraDB Cluster, run the migration on a single node to avoid lock issues.
+You need to temporarily run the following SQL command:
 ```sql
 SET GLOBAL pxc_strict_mode=PERMISSIVE;
 ```
 
-La funzionalità è attiva immediatamente dopo la migrazione, senza necessità di configurazione aggiuntiva.
-
+The feature is active immediately after migration, without any additional configuration needed.
