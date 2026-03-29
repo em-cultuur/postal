@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Script per testare l'endpoint MTA-STS localmente
+# Script to test the MTA-STS endpoint locally
 # Usage: ruby script/test_mta_sts_endpoint.rb [domain_name]
 
 require_relative '../config/environment'
@@ -9,49 +9,49 @@ require_relative '../config/environment'
 domain_name = ARGV[0] || 'nurtigo.io'
 
 puts "=" * 80
-puts "Test MTA-STS Endpoint per #{domain_name}"
+puts "Test MTA-STS Endpoint for #{domain_name}"
 puts "=" * 80
 puts
 
-# Trova il dominio nel database
+# Find the domain in the database
 domain = Domain.verified.where(mta_sts_enabled: true)
                .where("LOWER(name) = ?", domain_name.downcase)
                .first
 
 unless domain
-  puts "❌ Dominio non trovato o MTA-STS non abilitato"
+  puts "❌ Domain not found or MTA-STS not enabled"
   puts
-  puts "Verifica che:"
-  puts "  1. Il dominio '#{domain_name}' esista nel database"
-  puts "  2. Il dominio sia verificato (verified_at non NULL)"
-  puts "  3. MTA-STS sia abilitato (mta_sts_enabled = true)"
+  puts "Verify that:"
+  puts "  1. The domain '#{domain_name}' exists in the database"
+  puts "  2. The domain is verified (verified_at not NULL)"
+  puts "  3. MTA-STS is enabled (mta_sts_enabled = true)"
   puts
 
-  # Mostra informazioni sul dominio se esiste
+  # Show information about the domain if it exists
   any_domain = Domain.where("LOWER(name) = ?", domain_name.downcase).first
   if any_domain
-    puts "Dominio trovato ma con queste proprietà:"
-    puts "  - Verificato: #{any_domain.verified? ? '✅' : '❌'}"
-    puts "  - MTA-STS abilitato: #{any_domain.mta_sts_enabled ? '✅' : '❌'}"
+    puts "Domain found but with these properties:"
+    puts "  - Verified: #{any_domain.verified? ? '✅' : '❌'}"
+    puts "  - MTA-STS enabled: #{any_domain.mta_sts_enabled ? '✅' : '❌'}"
   else
-    puts "Nessun dominio trovato con nome '#{domain_name}'"
+    puts "No domain found with name '#{domain_name}'"
     puts
-    puts "Domini disponibili:"
+    puts "Available domains:"
     Domain.all.each do |d|
-      puts "  - #{d.name} (verificato: #{d.verified?}, MTA-STS: #{d.mta_sts_enabled})"
+      puts "  - #{d.name} (verified: #{d.verified?}, MTA-STS: #{d.mta_sts_enabled})"
     end
   end
 
   exit 1
 end
 
-puts "✅ Dominio trovato: #{domain.name}"
-puts "   - Verificato: #{domain.verified_at}"
+puts "✅ Domain found: #{domain.name}"
+puts "   - Verified: #{domain.verified_at}"
 puts "   - MTA-STS Mode: #{domain.mta_sts_mode}"
 puts "   - MTA-STS Max Age: #{domain.mta_sts_max_age}"
 puts
 
-# Testa la generazione della policy
+# Test policy generation
 puts "-" * 80
 puts "Policy Content:"
 puts "-" * 80
@@ -59,25 +59,25 @@ policy_content = domain.mta_sts_policy_content
 if policy_content
   puts policy_content
 else
-  puts "❌ Nessuna policy generata!"
+  puts "❌ No policy generated!"
 end
 puts
 
-# Simula una richiesta HTTP al controller
+# Simulate an HTTP request to the controller
 puts "-" * 80
-puts "Test della richiesta HTTP (simulata):"
+puts "HTTP request test (simulated):"
 puts "-" * 80
 
 require 'rack/mock'
 
-# Test con prefisso mta-sts
+# Test with mta-sts prefix
 test_hosts = [
   "mta-sts.#{domain_name}",
   domain_name
 ]
 
 test_hosts.each do |host|
-  puts "\nTest con Host: #{host}"
+  puts "\nTest with Host: #{host}"
   env = Rack::MockRequest.env_for(
     "https://#{host}/.well-known/mta-sts.txt",
     'HTTP_HOST' => host
@@ -98,21 +98,20 @@ test_hosts.each do |host|
                  end
 
   if status == 200
-    puts "  ✅ Successo!"
+    puts "  ✅ Success!"
     puts "  Body preview: #{body_content[0..100]}..."
   else
-    puts "  ❌ Errore!"
+    puts "  ❌ Error!"
     puts "  Body: #{body_content}"
   end
 end
 
 puts
 puts "=" * 80
-puts "Test completato!"
+puts "Test completed!"
 puts "=" * 80
 puts
-puts "NOTA: Se il test locale funziona ma il check dall'UI fallisce con 403,"
-puts "      il problema è nel tuo reverse proxy (nginx/apache/caddy)."
-puts "      Consulta doc/MTA-STS-PUBLIC-ACCESS.md per la configurazione."
+puts "NOTE: If the local test works but the UI check fails with 403,"
+puts "      the problem is in your reverse proxy (nginx/apache/caddy)."
+puts "      See doc/MTA-STS-PUBLIC-ACCESS.md for configuration."
 puts
-

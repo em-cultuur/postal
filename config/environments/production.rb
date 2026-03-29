@@ -80,8 +80,8 @@ Rails.application.configure do
   # - All mta-sts.* subdomains are allowed (for MTA-STS policy serving)
   # This ensures security while allowing MTA-STS to work correctly
 
-  # In production, Rails 7 HostAuthorization middleware può essere troppo restrittivo
-  # Aggiungiamo esplicitamente i domini MTA-STS se specificati
+  # In production, Rails 7 HostAuthorization middleware can be too restrictive
+  # We explicitly add the MTA-STS domains if specified
   if ENV['MTA_STS_DOMAINS'].present?
     ENV['MTA_STS_DOMAINS'].split(',').each do |domain|
       config.hosts << domain.strip

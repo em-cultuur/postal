@@ -1,188 +1,187 @@
-# Verifica Inizializzazione Database - Guida Rapida
+# Database Initialization Verification - Quick Guide
 
-## Come Verificare che Tutte le Migration Vengano Eseguite
+## How to Verify That All Migrations Are Executed
 
-### 1. Verifica Automatica con Test
+### 1. Automatic Verification with Tests
 
-Esegui il test di integrità dello schema:
+Run the schema integrity test:
 
 ```bash
 bundle exec rspec spec/lib/database_schema_integrity_spec.rb
 ```
 
-Questo test verifica:
-- ✅ La versione dello schema corrisponde all'ultima migration
-- ✅ Tutti i campi delle migration recenti sono presenti nel database
-- ✅ Tutte le migration sono state applicate
+This test verifies:
+- ✅ The schema version matches the latest migration
+- ✅ All fields from recent migrations are present in the database
+- ✅ All migrations have been applied
 
-### 2. Verifica Manuale della Versione
+### 2. Manual Version Check
 
 ```bash
-# Controlla la versione corrente dello schema
+# Check the current schema version
 bundle exec rails runner "puts ActiveRecord::Base.connection.migration_context.current_version"
 
-# Dovrebbe restituire: 20251109101656
+# Should return: 20251109101656
 ```
 
-### 3. Verifica Stato Migration
+### 3. Migration Status Check
 
 ```bash
-# Elenca lo stato di tutte le migration
+# List the status of all migrations
 bundle exec rake db:migrate:status
 
-# Output atteso: tutte le migration devono avere status "up"
+# Expected output: all migrations should have status "up"
 ```
 
-### 4. Inizializzazione Nuovo Database
+### 4. New Database Initialization
 
-Per inizializzare un nuovo database da zero:
+To initialize a new database from scratch:
 
 ```bash
-# Metodo 1: Usando il comando postal
+# Method 1: Using the postal command
 bin/postal initialize
 
-# Metodo 2: Usando rake direttamente
+# Method 2: Using rake directly
 bundle exec rake db:create postal:update
 ```
 
-**Cosa succede:**
-1. Viene creato il database se non esiste
-2. Il task `postal:update` verifica se ci sono migration già applicate
-3. Se NO → carica lo schema completo da `db/schema.rb` (più veloce)
-4. Se SI → applica solo le migration mancanti con `db:migrate`
+**What happens:**
+1. The database is created if it doesn't exist
+2. The `postal:update` task checks if there are already applied migrations
+3. If NO → loads the complete schema from `db/schema.rb` (faster)
+4. If YES → applies only the missing migrations with `db:migrate`
 
-### 5. Aggiornamento Database Esistente
+### 5. Updating an Existing Database
 
-Per aggiornare un database esistente con nuove migration:
+To update an existing database with new migrations:
 
 ```bash
-# Metodo 1: Usando il comando postal
+# Method 1: Using the postal command
 bin/postal update
-# oppure
+# or
 bin/postal upgrade
 
-# Metodo 2: Usando rake direttamente
+# Method 2: Using rake directly
 bundle exec rake postal:update
 ```
 
-**Cosa succede:**
-1. Verifica quali migration sono già state applicate
-2. Applica solo le migration nuove/mancanti
-3. Aggiorna anche i database dei messaggi di ogni server
+**What happens:**
+1. Checks which migrations have already been applied
+2. Applies only the new/missing migrations
+3. Also updates the message databases for each server
 
-### 6. Verifica dei Campi nel Database
+### 6. Field Verification in the Database
 
-#### Verifica campo Truemail
+#### Verify Truemail field
 
 ```bash
 bundle exec rails runner "puts Server.column_names.include?('truemail_enabled')"
-# Output atteso: true
+# Expected output: true
 ```
 
-#### Verifica campi DMARC
+#### Verify DMARC fields
 
 ```bash
 bundle exec rails runner "puts Domain.column_names.include?('dmarc_status') && Domain.column_names.include?('dmarc_error')"
-# Output atteso: true
+# Expected output: true
 ```
 
-#### Verifica campi MTA-STS e TLS-RPT
+#### Verify MTA-STS and TLS-RPT fields
 
 ```bash
 bundle exec rails runner "puts Domain.column_names.select { |c| c.start_with?('mta_sts_', 'tls_rpt_') }"
-# Output atteso: ["mta_sts_enabled", "mta_sts_mode", "mta_sts_max_age", "mta_sts_mx_patterns", "mta_sts_status", "mta_sts_error", "tls_rpt_enabled", "tls_rpt_email", "tls_rpt_status", "tls_rpt_error"]
+# Expected output: ["mta_sts_enabled", "mta_sts_mode", "mta_sts_max_age", "mta_sts_mx_patterns", "mta_sts_status", "mta_sts_error", "tls_rpt_enabled", "tls_rpt_email", "tls_rpt_status", "tls_rpt_error"]
 ```
 
 ## Troubleshooting
 
-### Problema: La versione dello schema non corrisponde all'ultima migration
+### Problem: The schema version does not match the latest migration
 
-**Soluzione:**
+**Solution:**
 ```bash
-# 1. Verifica quali migration mancano
+# 1. Check which migrations are missing
 bundle exec rake db:migrate:status
 
-# 2. Applica le migration mancanti
+# 2. Apply the missing migrations
 bundle exec rake db:migrate
 
-# 3. Verifica che lo schema sia stato aggiornato
+# 3. Verify that the schema has been updated
 bundle exec rails runner "puts ActiveRecord::Base.connection.migration_context.current_version"
 ```
 
-### Problema: Il database non esiste
+### Problem: The database does not exist
 
-**Soluzione:**
+**Solution:**
 ```bash
-# Inizializza il database da zero
+# Initialize the database from scratch
 bin/postal initialize
 ```
 
-### Problema: Migration fallita
+### Problem: Migration failed
 
-**Soluzione:**
+**Solution:**
 ```bash
-# 1. Verifica l'errore nei log
+# 1. Check the error in the logs
 tail -f log/development.log
 
-# 2. Fai rollback dell'ultima migration
+# 2. Rollback the last migration
 bundle exec rake db:rollback
 
-# 3. Correggi il problema nella migration
+# 3. Fix the problem in the migration
 
-# 4. Riapplica la migration
+# 4. Reapply the migration
 bundle exec rake db:migrate
 ```
 
-## File Importanti
+## Important Files
 
-- **`db/schema.rb`**: Schema del database (NON modificare manualmente!)
-- **`db/migrate/*.rb`**: File delle migration (in ordine cronologico)
-- **`lib/tasks/postal.rake`**: Task custom di Postal, include `postal:update`
-- **`config/database.yml`**: Configurazione del database
+- **`db/schema.rb`**: Database schema (DO NOT modify manually!)
+- **`db/migrate/*.rb`**: Migration files (in chronological order)
+- **`lib/tasks/postal.rake`**: Custom Postal tasks, includes `postal:update`
+- **`config/database.yml`**: Database configuration
 
 ## Best Practices
 
-1. **NON modificare mai `db/schema.rb` direttamente**
-   - Questo file è auto-generato da Rails
-   - Le modifiche verranno sovrascritte
+1. **NEVER modify `db/schema.rb` directly**
+   - This file is auto-generated by Rails
+   - Changes will be overwritten
 
-2. **Creare sempre migration per cambiamenti al database**
+2. **Always create migrations for database changes**
    ```bash
    bundle exec rails generate migration AddFieldToTable field:type
    ```
 
-3. **Testare le migration in development prima del deploy**
+3. **Test migrations in development before deploying**
    ```bash
-   # Applica la migration
+   # Apply the migration
    bundle exec rake db:migrate
-   
-   # Testa il rollback
+
+   # Test the rollback
    bundle exec rake db:rollback
-   
-   # Riapplica
+
+   # Reapply
    bundle exec rake db:migrate
    ```
 
-4. **Verificare sempre lo stato dopo deploy**
+4. **Always verify status after deployment**
    ```bash
    bin/postal update
    bundle exec rake db:migrate:status
    ```
 
-## Riepilogo Migration Recenti
+## Recent Migration Summary
 
-| Timestamp | Nome | Descrizione |
+| Timestamp | Name | Description |
 |-----------|------|-------------|
-| 20251109101656 | add_dmarc_fields_to_domains | Aggiunge campi DMARC validation |
-| 20251107000001 | add_mta_sts_and_tls_rpt_to_domains | Aggiunge supporto MTA-STS e TLS-RPT |
-| 20250915065902 | add_priority_to_server | Aggiunge priorità ai server |
-| 20250716102600 | add_truemail_enabled_to_servers | **Integrazione Truemail** |
+| 20251109101656 | add_dmarc_fields_to_domains | Adds DMARC validation fields |
+| 20251107000001 | add_mta_sts_and_tls_rpt_to_domains | Adds MTA-STS and TLS-RPT support |
+| 20250915065902 | add_priority_to_server | Adds priority to servers |
+| 20250716102600 | add_truemail_enabled_to_servers | **Truemail Integration** |
 
-## Conclusione
+## Conclusion
 
-✅ Il processo di inizializzazione del database di Postal è configurato correttamente per eseguire tutte le migration.
+✅ The Postal database initialization process is correctly configured to execute all migrations.
 
-✅ Lo schema attuale (versione: 20251109101656) include tutte le migration disponibili.
+✅ The current schema (version: 20251109101656) includes all available migrations.
 
-✅ Il sistema usa un approccio intelligente: carica lo schema completo per nuovi database, applica solo le migration mancanti per database esistenti.
-
+✅ The system uses an intelligent approach: loads the complete schema for new databases, applies only the missing migrations for existing databases.

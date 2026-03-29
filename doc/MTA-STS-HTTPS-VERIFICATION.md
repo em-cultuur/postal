@@ -1,98 +1,98 @@
-# Implementazione Verifica HTTPS Policy MTA-STS
+# MTA-STS HTTPS Policy Verification Implementation
 
-## Panoramica
-È stata aggiunta la funzionalità di verifica HTTPS del file policy MTA-STS in Postal. Questa funzionalità verifica che il file policy sia accessibile e valido tramite HTTPS all'URL `https://mta-sts.domain.com/.well-known/mta-sts.txt`.
+## Overview
+The HTTPS verification functionality for the MTA-STS policy file has been added to Postal. This feature verifies that the policy file is accessible and valid via HTTPS at the URL `https://mta-sts.domain.com/.well-known/mta-sts.txt`.
 
-## File Modificati
+## Modified Files
 
 ### 1. `app/models/concerns/has_dns_checks.rb`
-**Modifiche:**
-- Metodo `check_mta_sts_record` esteso per includere la verifica HTTPS
-- Aggiunto metodo `check_mta_sts_policy_file` per verificare l'accessibilità e validità del file policy
+**Changes:**
+- `check_mta_sts_record` method extended to include HTTPS verification
+- Added `check_mta_sts_policy_file` method to verify the accessibility and validity of the policy file
 
-**Funzionalità:**
-- Connessione HTTPS con verifica certificato SSL
-- Timeout di 10 secondi per apertura e lettura
-- Validazione del contenuto:
-  - Verifica presenza `version: STSv1`
-  - Verifica modalità valida (testing/enforce/none)
-  - Verifica valore max_age
-- Gestione errori dettagliata:
-  - Errori SSL (certificato non valido)
-  - Timeout di connessione
-  - Errori HTTP (404, 500, ecc.)
-  - Contenuto non valido
+**Functionality:**
+- HTTPS connection with SSL certificate verification
+- 10-second timeout for opening and reading
+- Content validation:
+  - Verifies presence of `version: STSv1`
+  - Verifies valid mode (testing/enforce/none)
+  - Verifies max_age value
+- Detailed error handling:
+  - SSL errors (invalid certificate)
+  - Connection timeout
+  - HTTP errors (404, 500, etc.)
+  - Invalid content
 
 ### 2. `app/models/domain.rb`
-**Aggiunto:**
-- Metodo `mta_sts_policy_url`: ritorna l'URL completo della policy
+**Added:**
+- `mta_sts_policy_url` method: returns the full policy URL
 
 ### 3. `app/controllers/domains_controller.rb`
-**Aggiunto:**
-- Action `check_mta_sts_policy`: permette di verificare manualmente il file policy
-- Supporta risposte in formato JSON e JavaScript
+**Added:**
+- `check_mta_sts_policy` action: allows manual verification of the policy file
+- Supports responses in JSON and JavaScript formats
 
 ### 4. `app/views/domains/setup.html.haml`
-**Modifiche:**
-- Aggiunto pulsante "Test MTA-STS Policy File" per verificare manualmente
-- Aggiunto link "View Policy File" per aprire il file in una nuova tab
-- Messaggio di stato aggiornato per indicare verifica DNS + HTTPS
+**Changes:**
+- Added "Test MTA-STS Policy File" button for manual verification
+- Added "View Policy File" link to open the file in a new tab
+- Updated status message to indicate DNS + HTTPS verification
 
 ### 5. `app/views/domains/check_mta_sts_policy.js.erb`
-**Nuovo file:**
-- Gestisce la risposta AJAX del test manuale
-- Mostra notifiche di successo/errore all'utente
+**New file:**
+- Handles the AJAX response for the manual test
+- Shows success/error notifications to the user
 
 ### 6. `config/routes.rb`
-**Aggiunto:**
-- Route `post :check_mta_sts_policy, on: :member` per entrambi i contesti (organization e server)
+**Added:**
+- Route `post :check_mta_sts_policy, on: :member` for both contexts (organization and server)
 
 ### 7. `doc/MTA-STS-AND-TLS-RPT.md`
-**Aggiornato:**
-- Documentazione completa della funzionalità di verifica HTTPS
-- Esempi di utilizzo e troubleshooting
+**Updated:**
+- Complete documentation of the HTTPS verification functionality
+- Usage examples and troubleshooting
 
 ### 8. `spec/models/mta_sts_spec.rb`
-**Nuovo file:**
-- Test RSpec per la verifica del file policy
-- Copertura di vari scenari (successo, errori HTTP, SSL, timeout, ecc.)
+**New file:**
+- RSpec tests for policy file verification
+- Coverage of various scenarios (success, HTTP errors, SSL, timeout, etc.)
 
-## Come Funziona
+## How It Works
 
-### Verifica Automatica (durante check DNS)
-Quando un utente clicca su "Check my records are correct", il sistema:
-1. Verifica il record DNS TXT `_mta-sts.domain.com`
-2. **NUOVO:** Effettua una richiesta HTTPS a `https://mta-sts.domain.com/.well-known/mta-sts.txt`
-3. Valida il certificato SSL
-4. Verifica che il server risponda con HTTP 200
-5. Valida il contenuto del file policy
-6. Aggiorna lo stato in `mta_sts_status` e `mta_sts_error`
+### Automatic Verification (during DNS check)
+When a user clicks "Check my records are correct", the system:
+1. Verifies the DNS TXT record `_mta-sts.domain.com`
+2. **NEW:** Makes an HTTPS request to `https://mta-sts.domain.com/.well-known/mta-sts.txt`
+3. Validates the SSL certificate
+4. Verifies that the server responds with HTTP 200
+5. Validates the policy file content
+6. Updates the status in `mta_sts_status` and `mta_sts_error`
 
-### Verifica Manuale
-Nella pagina "DNS Setup", quando MTA-STS è abilitato, l'utente può:
-1. Cliccare su "Test MTA-STS Policy File" per verificare solo il file policy
-2. Cliccare su "View Policy File" per aprire il file nel browser
-3. Ricevere feedback immediato su eventuali problemi
+### Manual Verification
+On the "DNS Setup" page, when MTA-STS is enabled, the user can:
+1. Click "Test MTA-STS Policy File" to verify only the policy file
+2. Click "View Policy File" to open the file in the browser
+3. Receive immediate feedback on any issues
 
-## Esempio di Utilizzo
+## Usage Example
 
 ### Via Web UI
-1. Vai alla pagina del dominio
-2. Clicca su "DNS Setup"
-3. Se MTA-STS è abilitato, vedrai la sezione MTA-STS
-4. Clicca su "Test MTA-STS Policy File" per verificare
-5. Riceverai una notifica verde se tutto è OK, oppure rossa con i dettagli dell'errore
+1. Go to the domain page
+2. Click "DNS Setup"
+3. If MTA-STS is enabled, you will see the MTA-STS section
+4. Click "Test MTA-STS Policy File" to verify
+5. You will receive a green notification if everything is OK, or a red one with error details
 
 ### Via API
 ```bash
-# Test manuale del file policy
+# Manual test of the policy file
 curl -X POST \
   https://postal.example.com/org/myorg/servers/myserver/domains/UUID/check_mta_sts_policy \
   -H 'Content-Type: application/json' \
   -H 'Cookie: session=...'
 ```
 
-Risposta in caso di successo:
+Success response:
 ```json
 {
   "success": true,
@@ -101,7 +101,7 @@ Risposta in caso di successo:
 }
 ```
 
-Risposta in caso di errore:
+Error response:
 ```json
 {
   "success": false,
@@ -110,66 +110,65 @@ Risposta in caso di errore:
 }
 ```
 
-## Messaggi di Errore
+## Error Messages
 
-### Errori SSL
+### SSL Errors
 ```
 SSL certificate error for https://mta-sts.example.com/.well-known/mta-sts.txt: certificate verify failed
 ```
-**Causa:** Il certificato SSL non è valido o non copre il sottodominio mta-sts
-**Soluzione:** Assicurati che il certificato SSL copra `*.domain.com` o `mta-sts.domain.com`
+**Cause:** The SSL certificate is not valid or does not cover the mta-sts subdomain
+**Solution:** Make sure the SSL certificate covers `*.domain.com` or `mta-sts.domain.com`
 
-### Errori HTTP
+### HTTP Errors
 ```
 Policy file returned HTTP 404. Expected 200. URL: https://mta-sts.example.com/.well-known/mta-sts.txt
 ```
-**Causa:** Il file policy non è accessibile all'URL specificato
-**Soluzione:** Verifica che il record A/CNAME per mta-sts.domain.com punti correttamente e che Postal stia servendo il file
+**Cause:** The policy file is not accessible at the specified URL
+**Solution:** Verify that the A/CNAME record for mta-sts.domain.com points correctly and that Postal is serving the file
 
-### Errori di Timeout
+### Timeout Errors
 ```
 Timeout while fetching policy file from https://mta-sts.example.com/.well-known/mta-sts.txt: execution expired
 ```
-**Causa:** Il server non risponde entro 10 secondi
-**Soluzione:** Verifica che il server sia raggiungibile e non ci siano problemi di firewall
+**Cause:** The server does not respond within 10 seconds
+**Solution:** Verify that the server is reachable and there are no firewall issues
 
-### Errori di Contenuto
+### Content Errors
 ```
 Policy file doesn't contain 'version: STSv1'. URL: https://mta-sts.example.com/.well-known/mta-sts.txt
 ```
-**Causa:** Il contenuto del file policy non è valido
-**Soluzione:** Verifica che MTA-STS sia abilitato correttamente in Postal e che la configurazione sia salvata
+**Cause:** The policy file content is not valid
+**Solution:** Verify that MTA-STS is correctly enabled in Postal and that the configuration is saved
 
 ## Testing
 
-Per testare la funzionalità:
+To test the functionality:
 
 ```bash
-# Esegui i test RSpec
+# Run the RSpec tests
 bundle exec rspec spec/models/mta_sts_spec.rb
 ```
 
-## Note Tecniche
+## Technical Notes
 
-- **Timeout:** 10 secondi per apertura + 10 secondi per lettura
-- **Verifica SSL:** OpenSSL::SSL::VERIFY_PEER (certificato deve essere valido)
-- **Caching:** La verifica NON è cachata, viene eseguita ad ogni richiesta
-- **Performance:** La verifica HTTPS viene eseguita solo quando check_dns viene chiamato o quando viene richiesta manualmente
+- **Timeout:** 10 seconds for opening + 10 seconds for reading
+- **SSL Verification:** OpenSSL::SSL::VERIFY_PEER (certificate must be valid)
+- **Caching:** Verification is NOT cached, it runs on every request
+- **Performance:** HTTPS verification is only executed when check_dns is called or when manually requested
 
-## Compatibilità
+## Compatibility
 
 - Rails 7.0+
 - Ruby 2.7+
-- Richiede gem `net/http` (inclusa in Ruby standard library)
+- Requires `net/http` gem (included in Ruby standard library)
 
 ## Troubleshooting
 
-### Il test manuale funziona ma check DNS fallisce
-Il metodo `check_dns` esegue più controlli in sequenza. Verifica gli altri record DNS (SPF, DKIM, MX) per assicurarti che non ci siano altri problemi.
+### Manual test works but DNS check fails
+The `check_dns` method runs multiple checks in sequence. Verify the other DNS records (SPF, DKIM, MX) to make sure there are no other issues.
 
-### Certificato SSL autofirmato in sviluppo
-Durante lo sviluppo, se usi certificati autofirmati, potresti voler temporaneamente disabilitare la verifica SSL modificando `http.verify_mode` in `has_dns_checks.rb`. **NON farlo in produzione!**
+### Self-signed SSL certificate in development
+During development, if you use self-signed certificates, you may want to temporarily disable SSL verification by modifying `http.verify_mode` in `has_dns_checks.rb`. **DO NOT do this in production!**
 
-### Rete locale / Docker
-Se Postal è in esecuzione in Docker o in una rete locale, assicurati che possa raggiungere il dominio pubblico per la verifica HTTPS.
-
+### Local network / Docker
+If Postal is running in Docker or on a local network, make sure it can reach the public domain for HTTPS verification.

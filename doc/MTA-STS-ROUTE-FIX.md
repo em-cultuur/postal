@@ -1,47 +1,47 @@
-# Fix per la Route MTA-STS .well-known/mta-sts.txt
+# Fix for the MTA-STS Route .well-known/mta-sts.txt
 
-## Problema Risolto
+## Problem Resolved
 
-La route `.well-known/mta-sts.txt` non funzionava correttamente perché:
+The `.well-known/mta-sts.txt` route was not working correctly because:
 
-1. **Host Authorization**: Rails bloccava le richieste da host con pattern `mta-sts.*`
-2. **Autenticazione**: Il controller richiedeva il login anche per endpoint pubblici
-3. **Eccezioni Authie**: Le eccezioni della sessione non venivano gestite correttamente per endpoint pubblici
-4. **CSRF Protection**: Il token CSRF causava errori 403
+1. **Host Authorization**: Rails was blocking requests from hosts with the `mta-sts.*` pattern
+2. **Authentication**: The controller required login even for public endpoints
+3. **Authie Exceptions**: Session exceptions were not being handled correctly for public endpoints
+4. **CSRF Protection**: The CSRF token was causing 403 errors
 
-## Modifiche Effettuate
+## Changes Made
 
-### 1. Controller MTA-STS (`app/controllers/mta_sts_controller.rb`)
+### 1. MTA-STS Controller (`app/controllers/mta_sts_controller.rb`)
 
-**Modifiche principali:**
-- ✅ Rimosso `skip_before_action :set_browser_id` (metodo non più esistente)
-- ✅ Aggiunto `protect_from_forgery with: :null_session` per endpoint pubblici
-- ✅ Aggiunto `rescue_from` per eccezioni Authie con handler che non fa nulla
-- ✅ Migliorato logging per debugging
-- ✅ Aggiunta ricerca case-insensitive per nomi dominio
+**Main changes:**
+- ✅ Removed `skip_before_action :set_browser_id` (method no longer exists)
+- ✅ Added `protect_from_forgery with: :null_session` for public endpoints
+- ✅ Added `rescue_from` for Authie exceptions with a no-op handler
+- ✅ Improved logging for debugging
+- ✅ Added case-insensitive search for domain names
 
-**Funzionalità:**
-- Endpoint pubblico accessibile senza autenticazione
-- Gestisce richieste sia da `mta-sts.example.com` che da `example.com`
-- Logging dettagliato per troubleshooting
-- Ricerca domini case-insensitive
+**Functionality:**
+- Public endpoint accessible without authentication
+- Handles requests from both `mta-sts.example.com` and `example.com`
+- Detailed logging for troubleshooting
+- Case-insensitive domain search
 
-### 2. Controller Well Known (`app/controllers/well_known_controller.rb`)
+### 2. Well Known Controller (`app/controllers/well_known_controller.rb`)
 
-**Modifiche:**
-- ✅ Rimosso `skip_before_action :set_browser_id` (non più esistente)
-- ✅ Aggiunto `protect_from_forgery with: :null_session` per consistenza
+**Changes:**
+- ✅ Removed `skip_before_action :set_browser_id` (no longer exists)
+- ✅ Added `protect_from_forgery with: :null_session` for consistency
 
-### 3. Controller Legacy API Base (`app/controllers/legacy_api/base_controller.rb`)
+### 3. Legacy API Base Controller (`app/controllers/legacy_api/base_controller.rb`)
 
-**Modifiche:**
-- ✅ Rimosso `skip_before_action :set_browser_id` (non più esistente)
+**Changes:**
+- ✅ Removed `skip_before_action :set_browser_id` (no longer exists)
 
-### 4. Configurazione Application (`config/application.rb`)
+### 4. Application Configuration (`config/application.rb`)
 
-**Modifiche:**
-- ✅ Aggiunto pattern per autorizzare host `mta-sts.*`
-- ✅ Pattern: `/\Amta-sts\./i` per accettare tutti i sottodomini mta-sts
+**Changes:**
+- ✅ Added pattern to authorize `mta-sts.*` hosts
+- ✅ Pattern: `/\Amta-sts\./i` to accept all mta-sts subdomains
 
 ```ruby
 config.hosts << Postal::Config.postal.web_hostname
@@ -49,70 +49,70 @@ config.hosts << Postal::Config.postal.web_hostname
 config.hosts << /\Amta-sts\./i
 ```
 
-### 5. Configurazione Test (`config/environments/test.rb`)
+### 5. Test Configuration (`config/environments/test.rb`)
 
-**Modifiche:**
-- ✅ Aggiunto `config.hosts << /.*/` per accettare qualsiasi host nei test
-- ✅ Semplifica il testing senza dover configurare host specifici
+**Changes:**
+- ✅ Added `config.hosts << /.*/` to accept any host in tests
+- ✅ Simplifies testing without needing to configure specific hosts
 
 ### 6. Test Specs (`spec/controllers/mta_sts_controller_spec.rb`)
 
-**Creato nuovo file di test con:**
-- ✅ Test per domini con MTA-STS abilitato
-- ✅ Test per MX patterns personalizzati
-- ✅ Test per domini non verificati
-- ✅ Test per domini con MTA-STS disabilitato
-- ✅ Test per domini inesistenti
-- ✅ Test per richieste senza prefisso mta-sts
-- ✅ Test per nomi dominio case-insensitive
-- ✅ Tutti i test passano ✅
+**Created new test file with:**
+- ✅ Test for domains with MTA-STS enabled
+- ✅ Test for custom MX patterns
+- ✅ Test for unverified domains
+- ✅ Test for domains with MTA-STS disabled
+- ✅ Test for non-existent domains
+- ✅ Test for requests without mta-sts prefix
+- ✅ Test for case-insensitive domain names
+- ✅ All tests pass ✅
 
-## Come Funziona Ora
+## How It Works Now
 
-### 1. Richiesta da `mta-sts.example.com`
+### 1. Request from `mta-sts.example.com`
 
 ```
 GET https://mta-sts.example.com/.well-known/mta-sts.txt
 Host: mta-sts.example.com
 ```
 
-**Flusso:**
-1. Host Authorization: `mta-sts.example.com` matcha il pattern `/\Amta-sts\./i` ✅
-2. Controller rimuove il prefisso `mta-sts.` → `example.com`
-3. Cerca `Domain.verified.where(mta_sts_enabled: true).where("LOWER(name) = ?", "example.com")`
-4. Se trovato, restituisce `domain.mta_sts_policy_content`
-5. Response: 200 OK con `Content-Type: text/plain; charset=utf-8`
+**Flow:**
+1. Host Authorization: `mta-sts.example.com` matches the pattern `/\Amta-sts\./i` ✅
+2. Controller removes the `mta-sts.` prefix → `example.com`
+3. Searches `Domain.verified.where(mta_sts_enabled: true).where("LOWER(name) = ?", "example.com")`
+4. If found, returns `domain.mta_sts_policy_content`
+5. Response: 200 OK with `Content-Type: text/plain; charset=utf-8`
 
-### 2. Richiesta da dominio principale
+### 2. Request from main domain
 
 ```
 GET https://example.com/.well-known/mta-sts.txt
 Host: example.com
 ```
 
-**Flusso:**
-1. Host Authorization: `example.com` è già autorizzato ✅
-2. Controller usa direttamente `example.com`
-3. Cerca dominio nel database
-4. Restituisce policy se trovata
+**Flow:**
+1. Host Authorization: `example.com` is already authorized ✅
+2. Controller uses `example.com` directly
+3. Searches for the domain in the database
+4. Returns policy if found
 
-### 3. Casi di errore
+### 3. Error Cases
 
-**404 Not Found quando:**
-- Dominio non esiste nel database
-- Dominio non è verificato (`verified_at IS NULL`)
-- MTA-STS non è abilitato (`mta_sts_enabled = false`)
-- Policy non è configurata (`mta_sts_policy_content` è vuoto)
+**404 Not Found when:**
+- Domain does not exist in the database
+- Domain is not verified (`verified_at IS NULL`)
+- MTA-STS is not enabled (`mta_sts_enabled = false`)
+- Policy is not configured (`mta_sts_policy_content` is empty)
 
-## Test
+## Tests
 
-Eseguire i test con:
+Run the tests with:
 
 ```bash
 bundle exec rspec spec/controllers/mta_sts_controller_spec.rb --format documentation
 ```
 
-**Risultato atteso:**
+**Expected result:**
 ```
 MTA-STS Policy
   GET /.well-known/mta-sts.txt
@@ -135,47 +135,46 @@ MTA-STS Policy
 8 examples, 0 failures
 ```
 
-## Configurazione DNS Richiesta
+## Required DNS Configuration
 
-Per servire correttamente le policy MTA-STS, configurare:
+To correctly serve MTA-STS policies, configure:
 
 ```
-# Record A o CNAME per mta-sts subdomain
-mta-sts.example.com.    A    <IP-SERVER-POSTAL>
-# oppure
+# A or CNAME record for mta-sts subdomain
+mta-sts.example.com.    A    <POSTAL-SERVER-IP>
+# or
 mta-sts.example.com.    CNAME    postal.example.com.
 
-# Record TXT per MTA-STS
+# TXT record for MTA-STS
 _mta-sts.example.com.    TXT    "v=STSv1; id=<policy-id>;"
 ```
 
 ## Logging
 
-Il controller ora logga tutte le richieste:
+The controller now logs all requests:
 
 ```
 MTA-STS policy request - Host: mta-sts.example.com, Extracted domain: example.com
 MTA-STS policy served successfully for domain: example.com
 ```
 
-Errori loggati:
+Logged errors:
 ```
 MTA-STS policy request failed - Invalid domain from host: invalid
 MTA-STS policy request failed - Domain not found or not enabled: nonexistent.com
 MTA-STS policy request failed - No policy content for domain: example.com
 ```
 
-## Note Importanti
+## Important Notes
 
-1. **Endpoint Pubblico**: Non richiede autenticazione - accessibile a tutti
-2. **Case Insensitive**: Accetta `EXAMPLE.COM`, `example.com`, `Example.Com`
-3. **Cache Control**: Rispetta il `mta_sts_max_age` del dominio (default: 86400)
-4. **HTTPS Obbligatorio**: In produzione MTA-STS richiede HTTPS con certificato valido
-5. **Standard Compliance**: Implementazione conforme a RFC 8461
+1. **Public Endpoint**: Does not require authentication - accessible to everyone
+2. **Case Insensitive**: Accepts `EXAMPLE.COM`, `example.com`, `Example.Com`
+3. **Cache Control**: Respects the domain's `mta_sts_max_age` (default: 86400)
+4. **HTTPS Required**: In production MTA-STS requires HTTPS with a valid certificate
+5. **Standard Compliance**: Implementation compliant with RFC 8461
 
-## Riferimenti
+## References
 
 - RFC 8461: SMTP MTA Strict Transport Security (MTA-STS)
 - [MTA-STS Documentation](./MTA-STS-AND-TLS-RPT.md)
 - [MTA-STS Implementation Summary](./MTA-STS-IMPLEMENTATION-SUMMARY.md)
-

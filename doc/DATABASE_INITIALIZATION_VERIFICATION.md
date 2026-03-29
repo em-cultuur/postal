@@ -1,29 +1,29 @@
-# Verifica dell'Inizializzazione del Database
+# Database Initialization Verification
 
-## Data: 10 Novembre 2025
+## Date: November 10, 2025
 
-## Riepilogo
+## Summary
 
-Questo documento verifica che tutte le migration configurate vengano eseguite durante l'inizializzazione del database di Postal.
+This document verifies that all configured migrations are executed during the Postal database initialization.
 
-## Processo di Inizializzazione
+## Initialization Process
 
-### 1. Comando di Inizializzazione
+### 1. Initialization Command
 
-Il comando principale per inizializzare il database è:
+The main command to initialize the database is:
 
 ```bash
 bin/postal initialize
 ```
 
-Questo comando esegue internamente:
+This command internally executes:
 ```bash
 bundle exec rake db:create postal:update
 ```
 
-### 2. Task `postal:update`
+### 2. `postal:update` Task
 
-Il task `postal:update` (definito in `lib/tasks/postal.rake`) implementa una logica intelligente:
+The `postal:update` task (defined in `lib/tasks/postal.rake`) implements an intelligent logic:
 
 ```ruby
 desc "Update the database"
@@ -40,70 +40,70 @@ task update: :environment do
 end
 ```
 
-**Comportamento:**
-- Se la tabella `schema_migrations` esiste ed ha record → esegue `db:migrate` (applica solo le migration mancanti)
-- Altrimenti → esegue `db:schema:load` (carica l'intero schema da `db/schema.rb`)
+**Behavior:**
+- If the `schema_migrations` table exists and has records → runs `db:migrate` (applies only missing migrations)
+- Otherwise → runs `db:schema:load` (loads the entire schema from `db/schema.rb`)
 
-### 3. Migration Disponibili
+### 3. Available Migrations
 
-Le migration presenti nella directory `db/migrate/` sono (in ordine cronologico):
+The migrations present in the `db/migrate/` directory are (in chronological order):
 
-1. `20161003195209_create_authie_sessions.authie.rb` - Crea sessioni Authie
-2. `20161003195210_add_indexes_to_authie_sessions.authie.rb` - Aggiunge indici
-3. `20161003195211_add_parent_id_to_authie_sessions.authie.rb` - Parent ID per sessioni
+1. `20161003195209_create_authie_sessions.authie.rb` - Creates Authie sessions
+2. `20161003195210_add_indexes_to_authie_sessions.authie.rb` - Adds indexes
+3. `20161003195211_add_parent_id_to_authie_sessions.authie.rb` - Parent ID for sessions
 4. `20161003195212_add_two_factor_auth_fields_to_authie.authie.rb` - 2FA fields
-5. `20170418200606_initial_schema.rb` - Schema iniziale completo
+5. `20170418200606_initial_schema.rb` - Complete initial schema
 6. `20170421195414_add_token_hashes_to_authie_sessions.authie.rb` - Token hash
-7. `20170421195415_add_index_to_token_hashes_on_authie_sessions.authie.rb` - Indice token hash
-8. `20170428153353_remove_type_from_ip_pools.rb` - Rimuove type da IP pools
-9. `20180216114344_add_host_to_authie_sessions.authie.rb` - Campo host
-10. `20200717083943_add_uuid_to_credentials.rb` - UUID per credentials
-11. `20210727210551_add_priority_to_ip_addresses.rb` - Priorità IP addresses
+7. `20170421195415_add_index_to_token_hashes_on_authie_sessions.authie.rb` - Token hash index
+8. `20170428153353_remove_type_from_ip_pools.rb` - Removes type from IP pools
+9. `20180216114344_add_host_to_authie_sessions.authie.rb` - Host field
+10. `20200717083943_add_uuid_to_credentials.rb` - UUID for credentials
+11. `20210727210551_add_priority_to_ip_addresses.rb` - IP addresses priority
 12. `20240206173036_add_privacy_mode_to_servers.rb` - Privacy mode
 13. `20240213165450_create_worker_roles.rb` - Worker roles
 14. `20240213171830_create_scheduled_tasks.rb` - Scheduled tasks
-15. `20240214132253_add_lock_fields_to_webhook_requests.rb` - Lock fields webhook
+15. `20240214132253_add_lock_fields_to_webhook_requests.rb` - Webhook lock fields
 16. `20240223141500_add_two_factor_required_to_sessions.authie.rb` - 2FA required
-17. `20240223141501_add_countries_to_authie_sessions.authie.rb` - Paesi per sessioni
+17. `20240223141501_add_countries_to_authie_sessions.authie.rb` - Countries for sessions
 18. `20240311205229_add_oidc_fields_to_user.rb` - OIDC fields
 19. `20250716102600_add_truemail_enabled_to_servers.rb` - **Truemail integration**
-20. `20250915065902_add_priority_to_server.rb` - Priorità server
-21. `20251107000001_add_mta_sts_and_tls_rpt_to_domains.rb` - MTA-STS e TLS-RPT
+20. `20250915065902_add_priority_to_server.rb` - Server priority
+21. `20251107000001_add_mta_sts_and_tls_rpt_to_domains.rb` - MTA-STS and TLS-RPT
 22. `20251109101656_add_dmarc_fields_to_domains.rb` - **DMARC fields**
 
-### 4. Versione Corrente dello Schema
+### 4. Current Schema Version
 
-Il file `db/schema.rb` ora riporta correttamente:
+The `db/schema.rb` file now correctly reports:
 
 ```ruby
 ActiveRecord::Schema[7.1].define(version: 2025_11_09_101656) do
 ```
 
-Questa è la versione dell'ultima migration disponibile (`20251109101656`).
+This is the version of the latest available migration (`20251109101656`).
 
-### 5. Verifica delle Modifiche Applicate
+### 5. Verification of Applied Changes
 
-#### Migration DMARC (20251109101656)
-La migration aggiunge alla tabella `domains`:
+#### DMARC Migration (20251109101656)
+The migration adds to the `domains` table:
 - `dmarc_status` (string)
 - `dmarc_error` (string)
 
-**Stato:** ✅ **APPLICATA** - I campi sono presenti nello schema.rb
+**Status:** ✅ **APPLIED** - Fields are present in schema.rb
 
-#### Migration Truemail (20250716102600)
-La migration aggiunge alla tabella `servers`:
+#### Truemail Migration (20250716102600)
+The migration adds to the `servers` table:
 - `truemail_enabled` (boolean, default: false)
 
-**Stato:** ✅ **APPLICATA** - Il campo è presente nello schema.rb
+**Status:** ✅ **APPLIED** - Field is present in schema.rb
 
-#### Migration Priority Server (20250915065902)
-La migration aggiunge alla tabella `servers`:
+#### Server Priority Migration (20250915065902)
+The migration adds to the `servers` table:
 - `priority` (integer, limit: 2, default: 0, unsigned: true)
 
-**Stato:** ✅ **APPLICATA** - Il campo è presente nello schema.rb
+**Status:** ✅ **APPLIED** - Field is present in schema.rb
 
-#### Migration MTA-STS e TLS-RPT (20251107000001)
-La migration aggiunge alla tabella `domains`:
+#### MTA-STS and TLS-RPT Migration (20251107000001)
+The migration adds to the `domains` table:
 - `mta_sts_enabled` (boolean, default: false)
 - `mta_sts_mode` (string, limit: 20, default: "testing")
 - `mta_sts_max_age` (integer, default: 86400)
@@ -115,33 +115,33 @@ La migration aggiunge alla tabella `domains`:
 - `tls_rpt_status` (string)
 - `tls_rpt_error` (string)
 
-**Stato:** ✅ **APPLICATA** - Tutti i campi sono presenti nello schema.rb
+**Status:** ✅ **APPLIED** - All fields are present in schema.rb
 
-## Conclusioni
+## Conclusions
 
-✅ **VERIFICA SUPERATA**: Tutte le migration configurate sono state correttamente integrate nello schema del database.
+✅ **VERIFICATION PASSED**: All configured migrations have been correctly integrated into the database schema.
 
-### Processo di Inizializzazione per Nuovo Database
+### New Database Initialization Process
 
-Quando viene inizializzato un nuovo database:
+When a new database is initialized:
 
-1. **Comando:** `bin/postal initialize`
-2. **Esecuzione:** `rake db:create postal:update`
-3. **Comportamento:** Poiché non esiste `schema_migrations`, viene eseguito `db:schema:load`
-4. **Risultato:** Il database viene creato con lo schema completo da `db/schema.rb` (versione 2025_11_09_101656)
+1. **Command:** `bin/postal initialize`
+2. **Execution:** `rake db:create postal:update`
+3. **Behavior:** Since `schema_migrations` does not exist, `db:schema:load` is executed
+4. **Result:** The database is created with the complete schema from `db/schema.rb` (version 2025_11_09_101656)
 
-### Processo di Aggiornamento Database Esistente
+### Existing Database Update Process
 
-Quando viene aggiornato un database esistente:
+When an existing database is updated:
 
-1. **Comando:** `bin/postal update` o `bin/postal upgrade`
-2. **Esecuzione:** `rake postal:update`
-3. **Comportamento:** Poiché esiste `schema_migrations` con record, viene eseguito `db:migrate`
-4. **Risultato:** Vengono applicate solo le migration non ancora eseguite
+1. **Command:** `bin/postal update` or `bin/postal upgrade`
+2. **Execution:** `rake postal:update`
+3. **Behavior:** Since `schema_migrations` exists with records, `db:migrate` is executed
+4. **Result:** Only the migrations not yet applied are executed
 
-### Migration Message Databases
+### Message Database Migrations
 
-Il task `db:migrate` è stato esteso per eseguire anche le migration sui database dei messaggi:
+The `db:migrate` task has been extended to also run migrations on the message databases:
 
 ```ruby
 Rake::Task["db:migrate"].enhance do
@@ -149,22 +149,21 @@ Rake::Task["db:migrate"].enhance do
 end
 ```
 
-Questo assicura che anche i database specifici di ogni server vengano aggiornati.
+This ensures that the databases specific to each server are also updated.
 
-## Raccomandazioni
+## Recommendations
 
-1. ✅ **NON modificare mai direttamente** `db/schema.rb` - questo file è auto-generato
-2. ✅ **Creare sempre migration** per modifiche al database usando `rails generate migration`
-3. ✅ **Testare le migration** in ambiente development prima del deploy
-4. ✅ **Mantenere l'ordine cronologico** dei timestamp delle migration
-5. ✅ **Includere metodi up/down** o usare `change` per migration reversibili
+1. ✅ **NEVER directly modify** `db/schema.rb` - this file is auto-generated
+2. ✅ **Always create migrations** for database changes using `rails generate migration`
+3. ✅ **Test migrations** in the development environment before deploying
+4. ✅ **Maintain chronological order** of migration timestamps
+5. ✅ **Include up/down methods** or use `change` for reversible migrations
 
-## Integrazione Truemail
+## Truemail Integration
 
-La migration `20250716102600_add_truemail_enabled_to_servers.rb` è stata correttamente applicata e permette di:
+The migration `20250716102600_add_truemail_enabled_to_servers.rb` has been correctly applied and allows:
 
-- Abilitare/disabilitare Truemail per singolo server tramite il campo `truemail_enabled`
-- Integrarsi con Truemail-Rack via API per validare gli indirizzi email prima dell'invio
+- Enabling/disabling Truemail per individual server via the `truemail_enabled` field
+- Integrating with Truemail-Rack via API to validate email addresses before sending
 
-Questa integrazione segue lo stesso pattern di SpamAssassin e ClamAV come richiesto nelle istruzioni.
-
+This integration follows the same pattern as SpamAssassin and ClamAV as requested in the instructions.

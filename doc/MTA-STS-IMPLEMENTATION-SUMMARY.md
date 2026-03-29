@@ -1,74 +1,74 @@
-# Riepilogo Implementazione Verifica HTTPS MTA-STS Policy
+# MTA-STS HTTPS Policy Verification Implementation Summary
 
-## ✅ Implementazione Completata
+## ✅ Implementation Complete
 
-È stata aggiunta con successo la funzionalità di verifica HTTPS del file policy MTA-STS in Postal.
+The HTTPS verification functionality for the MTA-STS policy file has been successfully added to Postal.
 
-## 📋 Cosa è stato fatto
+## 📋 What Was Done
 
-### 1. Backend - Verifica HTTPS Automatica
-- ✅ Metodo `check_mta_sts_policy_file` in `HasDNSChecks` concern
-- ✅ Integrazione automatica nel metodo `check_mta_sts_record`
-- ✅ Validazione completa del file policy (versione, modalità, max_age)
-- ✅ Gestione errori dettagliata (SSL, HTTP, timeout, formato)
+### 1. Backend - Automatic HTTPS Verification
+- ✅ `check_mta_sts_policy_file` method in `HasDNSChecks` concern
+- ✅ Automatic integration in the `check_mta_sts_record` method
+- ✅ Complete policy file validation (version, mode, max_age)
+- ✅ Detailed error handling (SSL, HTTP, timeout, format)
 
-### 2. Backend - Verifica Manuale
-- ✅ Action `check_mta_sts_policy` nel controller `DomainsController`
-- ✅ Supporto formati JSON e JavaScript
-- ✅ Route POST per verifica manuale
+### 2. Backend - Manual Verification
+- ✅ `check_mta_sts_policy` action in the `DomainsController`
+- ✅ JSON and JavaScript format support
+- ✅ POST route for manual verification
 
-### 3. Frontend - Interfaccia Utente
-- ✅ Pulsante "Test MTA-STS Policy File" nella pagina DNS Setup
-- ✅ Link "View Policy File" per aprire il file nel browser
-- ✅ Vista JavaScript per feedback AJAX
-- ✅ Messaggi di stato migliorati (DNS + HTTPS)
+### 3. Frontend - User Interface
+- ✅ "Test MTA-STS Policy File" button on the DNS Setup page
+- ✅ "View Policy File" link to open the file in the browser
+- ✅ JavaScript view for AJAX feedback
+- ✅ Improved status messages (DNS + HTTPS)
 
 ### 4. Model - Helper Methods
-- ✅ Metodo `mta_sts_policy_url` per URL completo della policy
+- ✅ `mta_sts_policy_url` method for full policy URL
 
-### 5. Documentazione
-- ✅ `doc/MTA-STS-AND-TLS-RPT.md` aggiornato con nuova funzionalità
-- ✅ `doc/MTA-STS-HTTPS-VERIFICATION.md` con guida dettagliata
-- ✅ Esempi di utilizzo e troubleshooting
+### 5. Documentation
+- ✅ `doc/MTA-STS-AND-TLS-RPT.md` updated with new functionality
+- ✅ `doc/MTA-STS-HTTPS-VERIFICATION.md` with detailed guide
+- ✅ Usage examples and troubleshooting
 
 ### 6. Testing
-- ✅ Spec RSpec per test della verifica policy
-- ✅ Copertura scenari: successo, errori HTTP, SSL, timeout
+- ✅ RSpec spec for policy verification test
+- ✅ Scenario coverage: success, HTTP errors, SSL, timeout
 
-## 🚀 Come Usare
+## 🚀 How to Use
 
-### Verifica Automatica
-Quando l'utente clicca su **"Check my records are correct"** nella pagina DNS Setup:
-1. Postal verifica il record DNS `_mta-sts.domain.com`
-2. **NUOVO:** Postal effettua una richiesta HTTPS a `https://mta-sts.domain.com/.well-known/mta-sts.txt`
-3. Valida il certificato SSL
-4. Verifica il contenuto del file
-5. Mostra il risultato nella pagina
+### Automatic Verification
+When the user clicks **"Check my records are correct"** on the DNS Setup page:
+1. Postal verifies the DNS record `_mta-sts.domain.com`
+2. **NEW:** Postal makes an HTTPS request to `https://mta-sts.domain.com/.well-known/mta-sts.txt`
+3. Validates the SSL certificate
+4. Verifies the file content
+5. Shows the result on the page
 
-### Verifica Manuale
-Nella sezione MTA-STS della pagina DNS Setup:
-- **"Test MTA-STS Policy File"**: Verifica solo il file policy via HTTPS
-- **"View Policy File"**: Apre il file nel browser
+### Manual Verification
+In the MTA-STS section of the DNS Setup page:
+- **"Test MTA-STS Policy File"**: Verifies only the policy file via HTTPS
+- **"View Policy File"**: Opens the file in the browser
 
-## 🔍 Controlli Effettuati
+## 🔍 Checks Performed
 
-La verifica HTTPS controlla:
-1. ✅ **Connessione HTTPS** - Raggiungibilità del server
-2. ✅ **Certificato SSL** - Validità e copertura del dominio
-3. ✅ **HTTP Status** - Deve essere 200 OK
-4. ✅ **Contenuto Policy** - Presenza di `version: STSv1`
-5. ✅ **Modalità** - Deve essere `testing`, `enforce` o `none`
-6. ✅ **Max Age** - Deve essere un numero valido
+The HTTPS verification checks:
+1. ✅ **HTTPS Connection** - Server reachability
+2. ✅ **SSL Certificate** - Validity and domain coverage
+3. ✅ **HTTP Status** - Must be 200 OK
+4. ✅ **Policy Content** - Presence of `version: STSv1`
+5. ✅ **Mode** - Must be `testing`, `enforce`, or `none`
+6. ✅ **Max Age** - Must be a valid number
 
-## 📊 Messaggi di Stato
+## 📊 Status Messages
 
-### ✅ Successo (Verde)
+### ✅ Success (Green)
 ```
 Your MTA-STS DNS record and policy file are accessible and valid!
 ```
 
-### ⚠️ Errori (Arancione)
-Esempi:
+### ⚠️ Errors (Orange)
+Examples:
 - `SSL certificate error for https://mta-sts.example.com/.well-known/mta-sts.txt: certificate verify failed`
 - `Policy file returned HTTP 404. Expected 200. URL: https://...`
 - `Policy file doesn't contain 'version: STSv1'. URL: https://...`
@@ -77,21 +77,21 @@ Esempi:
 ## 🧪 Testing
 
 ```bash
-# Esegui i test
+# Run the tests
 bundle exec rspec spec/models/mta_sts_spec.rb
 
-# Verifica le route
+# Verify the routes
 bundle exec rails routes | grep mta_sts
 ```
 
-## 📝 Note Importanti
+## 📝 Important Notes
 
-1. **Timeout**: 10 secondi per connessione + 10 secondi per lettura
-2. **SSL Obbligatorio**: Il certificato DEVE essere valido (no autofirmati in produzione)
-3. **Verifica Completa**: La verifica HTTPS è parte integrante del check DNS
-4. **No Caching**: Ogni verifica effettua una nuova richiesta HTTPS
+1. **Timeout**: 10 seconds for connection + 10 seconds for reading
+2. **SSL Required**: The certificate MUST be valid (no self-signed in production)
+3. **Complete Verification**: HTTPS verification is an integral part of the DNS check
+4. **No Caching**: Each verification makes a new HTTPS request
 
-## 🔗 Route Create
+## 🔗 Created Routes
 
 ```
 POST /org/:org_permalink/domains/:id/check_mta_sts_policy
@@ -99,27 +99,26 @@ POST /org/:org_permalink/servers/:server_id/domains/:id/check_mta_sts_policy
 GET  /.well-known/mta-sts.txt
 ```
 
-## 📚 Documentazione
+## 📚 Documentation
 
-Per maggiori dettagli, consulta:
-- `doc/MTA-STS-AND-TLS-RPT.md` - Documentazione completa MTA-STS/TLS-RPT
-- `doc/MTA-STS-HTTPS-VERIFICATION.md` - Guida dettagliata verifica HTTPS
+For more details, see:
+- `doc/MTA-STS-AND-TLS-RPT.md` - Complete MTA-STS/TLS-RPT documentation
+- `doc/MTA-STS-HTTPS-VERIFICATION.md` - Detailed HTTPS verification guide
 
-## ✨ Prossimi Passi
+## ✨ Next Steps
 
-Per utilizzare la funzionalità:
+To use the functionality:
 
-1. Esegui la migration: `bundle exec rails db:migrate` (se non già fatto)
-2. Configura un dominio con MTA-STS abilitato
-3. Configura i record DNS necessari
-4. Vai alla pagina "DNS Setup" del dominio
-5. Clicca su "Configure MTA-STS & TLS-RPT" per abilitare
-6. Torna alla pagina "DNS Setup"
-7. Clicca su "Test MTA-STS Policy File" per verificare
+1. Run the migration: `bundle exec rails db:migrate` (if not already done)
+2. Configure a domain with MTA-STS enabled
+3. Configure the required DNS records
+4. Go to the domain's "DNS Setup" page
+5. Click "Configure MTA-STS & TLS-RPT" to enable
+6. Return to the "DNS Setup" page
+7. Click "Test MTA-STS Policy File" to verify
 
 ---
 
-**Implementato da:** GitHub Copilot  
-**Data:** 7 Novembre 2025  
-**Versione Postal:** 7.0+
-
+**Implemented by:** GitHub Copilot
+**Date:** November 7, 2025
+**Postal Version:** 7.0+

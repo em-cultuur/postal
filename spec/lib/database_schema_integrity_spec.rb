@@ -5,21 +5,21 @@ require "rails_helper"
 RSpec.describe "Database Schema Integrity" do
   describe "schema version" do
     it "matches the latest migration timestamp" do
-      # Ottieni tutte le migration dalla directory
+      # Get all migrations from the directory
       migration_files = Dir.glob(Rails.root.join("db", "migrate", "*.rb"))
 
-      # Estrai i timestamp dalle migration
+      # Extract timestamps from migrations
       migration_versions = migration_files.map do |file|
         File.basename(file).split("_").first.to_i
       end
 
-      # Trova la versione più recente
+      # Find the most recent version
       latest_migration_version = migration_versions.max
 
-      # Ottieni la versione corrente dello schema
+      # Get the current schema version
       schema_version = ActiveRecord::Base.connection.migration_context.current_version
 
-      # Verifica che corrispondano
+      # Verify they match
       expect(schema_version).to eq(latest_migration_version),
                                 "Schema version (#{schema_version}) should match the latest migration (#{latest_migration_version})"
     end
@@ -29,18 +29,18 @@ RSpec.describe "Database Schema Integrity" do
     it "contains the correct version number" do
       schema_content = File.read(Rails.root.join("db", "schema.rb"))
 
-      # Estrai la versione dal file schema.rb (supporta versioni con underscore come 2026_01_26_000006)
+      # Extract the version from schema.rb (supports versions with underscores like 2026_01_26_000006)
       schema_version_match = schema_content.match(/ActiveRecord::Schema\[[\d.]+\]\.define\(version: (\d+(?:_\d+)*)\)/)
       expect(schema_version_match).not_to be_nil, "Could not find schema version in db/schema.rb"
 
       schema_file_version = schema_version_match[1].to_i
 
-      # Ottieni l'ultima migration
+      # Get the latest migration
       migration_files = Dir.glob(Rails.root.join("db", "migrate", "*.rb"))
       migration_versions = migration_files.map { |file| File.basename(file).split("_").first.to_i }
       latest_migration_version = migration_versions.max
 
-      # Verifica che corrispondano
+      # Verify they match
       expect(schema_file_version).to eq(latest_migration_version),
                                      "Schema file version (#{schema_file_version}) should match the latest migration (#{latest_migration_version})"
     end
@@ -90,14 +90,14 @@ RSpec.describe "Database Schema Integrity" do
 
   describe "all migrations" do
     it "have been applied to the database" do
-      # Ottieni tutte le migration dalla directory
+      # Get all migrations from the directory
       migration_files = Dir.glob(Rails.root.join("db", "migrate", "*.rb"))
       migration_versions = migration_files.map { |file| File.basename(file).split("_").first }
 
-      # Ottieni le migration applicate dal database
+      # Get applied migrations from the database
       applied_migrations = ActiveRecord::Base.connection.migration_context.get_all_versions
 
-      # Verifica che tutte le migration siano state applicate
+      # Verify all migrations have been applied
       missing_migrations = migration_versions.map(&:to_i) - applied_migrations.map(&:to_i)
 
       expect(missing_migrations).to be_empty,

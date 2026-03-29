@@ -1,135 +1,135 @@
-# Esempi Pratici - Verifica HTTPS MTA-STS Policy
+# Practical Examples - MTA-STS HTTPS Policy Verification
 
-## Scenario 1: Configurazione e Test di un Nuovo Dominio
+## Scenario 1: Configuration and Testing of a New Domain
 
-### Passo 1: Aggiungi il dominio
+### Step 1: Add the domain
 ```
-1. Vai su Postal → Organization → Server → Domains
-2. Clicca "Add Domain"
-3. Inserisci "example.com"
-4. Verifica il dominio (DNS o Email)
-```
-
-### Passo 2: Abilita MTA-STS
-```
-1. Vai alla pagina del dominio
-2. Clicca "Configure MTA-STS & TLS-RPT"
-3. Spunta "Enable MTA-STS"
-4. Seleziona modalità "Testing"
-5. Imposta Max Age: 86400 (1 giorno per test)
-6. Lascia vuoti i pattern MX (usa default)
-7. Clicca "Save Security Settings"
+1. Go to Postal → Organization → Server → Domains
+2. Click "Add Domain"
+3. Enter "example.com"
+4. Verify the domain (DNS or Email)
 ```
 
-### Passo 3: Configura DNS
+### Step 2: Enable MTA-STS
 ```
-1. Nel tuo provider DNS, aggiungi:
-
-   Record TXT:
-   Nome: _mta-sts.example.com
-   Valore: v=STSv1; id=20251107abc123;
-   
-   Record A o CNAME:
-   Nome: mta-sts.example.com
-   Valore: postal.yourserver.com (o IP del tuo Postal)
+1. Go to the domain page
+2. Click "Configure MTA-STS & TLS-RPT"
+3. Check "Enable MTA-STS"
+4. Select "Testing" mode
+5. Set Max Age: 86400 (1 day for testing)
+6. Leave MX patterns empty (use defaults)
+7. Click "Save Security Settings"
 ```
 
-### Passo 4: Verifica Policy File
+### Step 3: Configure DNS
 ```
-1. Torna alla pagina "DNS Setup" del dominio
-2. Nella sezione MTA-STS, clicca "Test MTA-STS Policy File"
-3. Dovresti vedere: "MTA-STS policy file is accessible and valid"
+1. In your DNS provider, add:
+
+   TXT Record:
+   Name: _mta-sts.example.com
+   Value: v=STSv1; id=20251107abc123;
+
+   A or CNAME Record:
+   Name: mta-sts.example.com
+   Value: postal.yourserver.com (or your Postal IP)
 ```
 
-### Passo 5: Verifica Completa DNS
+### Step 4: Verify Policy File
 ```
-1. Clicca "Check my records are correct"
-2. Postal verificherà:
+1. Return to the domain's "DNS Setup" page
+2. In the MTA-STS section, click "Test MTA-STS Policy File"
+3. You should see: "MTA-STS policy file is accessible and valid"
+```
+
+### Step 5: Complete DNS Verification
+```
+1. Click "Check my records are correct"
+2. Postal will verify:
    - SPF Record ✓
    - DKIM Record ✓
    - MX Records ✓
    - Return Path ✓
    - MTA-STS DNS Record ✓
-   - MTA-STS HTTPS Policy ✓ (NUOVO!)
+   - MTA-STS HTTPS Policy ✓ (NEW!)
 ```
 
-## Scenario 2: Debugging Errore SSL
+## Scenario 2: Debugging SSL Error
 
-### Problema
+### Problem
 ```
-SSL certificate error for https://mta-sts.example.com/.well-known/mta-sts.txt: 
+SSL certificate error for https://mta-sts.example.com/.well-known/mta-sts.txt:
 certificate verify failed (unable to get local issuer certificate)
 ```
 
-### Soluzione
+### Solution
 ```
-1. Verifica che il certificato SSL copra il sottodominio:
-   - Certificato per *.example.com (wildcard), oppure
-   - Certificato per mta-sts.example.com (specifico)
+1. Verify that the SSL certificate covers the subdomain:
+   - Certificate for *.example.com (wildcard), or
+   - Certificate for mta-sts.example.com (specific)
 
-2. Se usi Let's Encrypt, rigenera il certificato includendo SAN:
+2. If using Let's Encrypt, regenerate the certificate including SAN:
    certbot certonly --webroot -w /var/www/html \
      -d example.com \
      -d mta-sts.example.com \
      -d www.example.com
 
-3. Ricarica il server web (nginx/apache)
+3. Reload the web server (nginx/apache)
 
-4. Riprova il test in Postal
+4. Retry the test in Postal
 ```
 
-### Verifica Manuale del Certificato
+### Manual Certificate Verification
 ```bash
-# Controlla il certificato SSL
+# Check the SSL certificate
 openssl s_client -connect mta-sts.example.com:443 -servername mta-sts.example.com < /dev/null 2>/dev/null | openssl x509 -noout -text | grep DNS
 
-# Dovrebbe mostrare:
+# Should show:
 # DNS:example.com, DNS:mta-sts.example.com, DNS:*.example.com
 ```
 
 ## Scenario 3: Debugging HTTP 404
 
-### Problema
+### Problem
 ```
-Policy file returned HTTP 404. Expected 200. 
+Policy file returned HTTP 404. Expected 200.
 URL: https://mta-sts.example.com/.well-known/mta-sts.txt
 ```
 
-### Diagnosi
+### Diagnosis
 ```bash
-# Test manuale con curl
+# Manual test with curl
 curl -v https://mta-sts.example.com/.well-known/mta-sts.txt
 
-# Controlla la risposta HTTP
+# Check the HTTP response
 ```
 
-### Possibili Cause
+### Possible Causes
 
-#### Causa 1: DNS non punta a Postal
+#### Cause 1: DNS does not point to Postal
 ```
-1. Verifica il record DNS:
+1. Verify the DNS record:
    dig mta-sts.example.com
-   
-2. Dovrebbe puntare al tuo server Postal
+
+2. It should point to your Postal server
 ```
 
-#### Causa 2: MTA-STS non abilitato in Postal
+#### Cause 2: MTA-STS not enabled in Postal
 ```
-1. Vai in "Configure MTA-STS & TLS-RPT"
-2. Assicurati che "Enable MTA-STS" sia spuntato
-3. Salva le impostazioni
+1. Go to "Configure MTA-STS & TLS-RPT"
+2. Make sure "Enable MTA-STS" is checked
+3. Save the settings
 ```
 
-#### Causa 3: Server web non configurato
+#### Cause 3: Web server not configured
 ```
-1. Se usi un reverse proxy (nginx/apache), assicurati che:
-   - Il dominio mta-sts.example.com sia configurato
-   - Le richieste .well-known vengano passate a Postal
-   
-Esempio nginx:
+1. If using a reverse proxy (nginx/apache), make sure that:
+   - The mta-sts.example.com domain is configured
+   - .well-known requests are passed to Postal
+
+Nginx example:
 server {
     server_name mta-sts.example.com;
-    
+
     location /.well-known/mta-sts.txt {
         proxy_pass http://postal_backend;
         proxy_set_header Host $host;
@@ -137,24 +137,24 @@ server {
 }
 ```
 
-## Scenario 4: Policy con Pattern MX Personalizzati
+## Scenario 4: Policy with Custom MX Patterns
 
-### Configurazione
+### Configuration
 ```
-1. Vai in "Configure MTA-STS & TLS-RPT"
-2. In "MX Patterns", inserisci (uno per riga):
+1. Go to "Configure MTA-STS & TLS-RPT"
+2. In "MX Patterns", enter (one per line):
    mx1.example.com
    mx2.example.com
    backup-mx.example.com
-3. Salva
+3. Save
 ```
 
-### Verifica del Contenuto
+### Content Verification
 ```bash
-# Controlla il contenuto della policy
+# Check the policy content
 curl https://mta-sts.example.com/.well-known/mta-sts.txt
 
-# Output atteso:
+# Expected output:
 version: STSv1
 mode: testing
 mx: mx1.example.com
@@ -163,33 +163,33 @@ mx: backup-mx.example.com
 max_age: 86400
 ```
 
-## Scenario 5: Passaggio da Testing a Enforce
+## Scenario 5: Switching from Testing to Enforce
 
-### Raccomandazioni
+### Recommendations
 ```
-1. Usa modalità "testing" per almeno 7 giorni
-2. Monitora i report TLS-RPT per errori
-3. Aumenta gradualmente il max_age:
-   - Giorno 1-7: 86400 (1 giorno)
-   - Giorno 8-14: 604800 (7 giorni)
-   - Giorno 15+: 2592000 (30 giorni) in modalità enforce
+1. Use "testing" mode for at least 7 days
+2. Monitor TLS-RPT reports for errors
+3. Gradually increase the max_age:
+   - Day 1-7: 86400 (1 day)
+   - Day 8-14: 604800 (7 days)
+   - Day 15+: 2592000 (30 days) in enforce mode
 ```
 
-### Procedura
+### Procedure
 ```
-1. Vai in "Configure MTA-STS & TLS-RPT"
-2. Cambia modalità da "testing" a "enforce"
-3. Aumenta max_age a 604800
-4. Salva
-5. Il DNS record _mta-sts si aggiornerà automaticamente con nuovo ID
-6. Clicca "Test MTA-STS Policy File" per conferma
+1. Go to "Configure MTA-STS & TLS-RPT"
+2. Change mode from "testing" to "enforce"
+3. Increase max_age to 604800
+4. Save
+5. The _mta-sts DNS record will automatically update with a new ID
+6. Click "Test MTA-STS Policy File" to confirm
 ```
 
 ## Scenario 6: API Testing
 
-### Test Manuale via cURL
+### Manual Test via cURL
 ```bash
-# Login e ottieni cookie di sessione
+# Login and get session cookie
 curl -c cookies.txt -X POST https://postal.example.com/login \
   -d "email_address=admin@example.com" \
   -d "password=yourpassword"
@@ -199,14 +199,14 @@ curl -b cookies.txt -X POST \
   https://postal.example.com/org/myorg/servers/myserver/domains/DOMAIN-UUID/check_mta_sts_policy \
   -H "Accept: application/json"
 
-# Output atteso (successo):
+# Expected output (success):
 {
   "success": true,
   "message": "MTA-STS policy file is accessible and valid at https://mta-sts.example.com/.well-known/mta-sts.txt",
   "url": "https://mta-sts.example.com/.well-known/mta-sts.txt"
 }
 
-# Output atteso (errore):
+# Expected output (error):
 {
   "success": false,
   "error": "Policy file returned HTTP 404. Expected 200. URL: https://mta-sts.example.com/.well-known/mta-sts.txt",
@@ -214,87 +214,86 @@ curl -b cookies.txt -X POST \
 }
 ```
 
-## Scenario 7: Monitoraggio e Logging
+## Scenario 7: Monitoring and Logging
 
-### Log delle Richieste
+### Request Logs
 ```bash
-# Tail dei log di Postal
+# Tail Postal logs
 tail -f log/development.log | grep -i mta-sts
 
-# Esempio di log per richiesta di verifica:
+# Example log for verification request:
 Started POST "/org/myorg/servers/myserver/domains/abc123/check_mta_sts_policy"
 Processing by DomainsController#check_mta_sts_policy
 Completed 200 OK
 ```
 
-### Verifica da Riga di Comando Rails
+### Verification from Rails Command Line
 ```bash
-# Entra nella console Rails
+# Enter the Rails console
 bundle exec rails console
 
-# Trova il dominio
+# Find the domain
 domain = Domain.find_by(name: 'example.com')
 
-# Verifica manualmente
+# Manual verification
 result = domain.check_mta_sts_policy_file
 puts result.inspect
 
 # Output:
-# {:success=>true} oppure
+# {:success=>true} or
 # {:success=>false, :error=>"..."}
 
-# Verifica completa DNS (include HTTPS)
+# Complete DNS verification (includes HTTPS)
 domain.check_mta_sts_record
 puts domain.mta_sts_status  # "OK", "Invalid", "Missing"
-puts domain.mta_sts_error    # nil oppure messaggio errore
+puts domain.mta_sts_error    # nil or error message
 ```
 
 ## Scenario 8: Troubleshooting Timeout
 
-### Problema
+### Problem
 ```
-Timeout while fetching policy file from https://mta-sts.example.com/.well-known/mta-sts.txt: 
+Timeout while fetching policy file from https://mta-sts.example.com/.well-known/mta-sts.txt:
 execution expired
 ```
 
-### Diagnosi
+### Diagnosis
 ```bash
-# Test connessione manuale
+# Manual connection test
 time curl -v https://mta-sts.example.com/.well-known/mta-sts.txt
 
-# Se impiega più di 10 secondi:
-# 1. Controlla firewall
-# 2. Controlla performance del server
-# 3. Controlla latenza di rete
+# If it takes more than 10 seconds:
+# 1. Check firewall
+# 2. Check server performance
+# 3. Check network latency
 ```
 
-### Soluzione Temporanea (solo sviluppo!)
+### Temporary Solution (development only!)
 ```ruby
 # In app/models/concerns/has_dns_checks.rb
-# Aumenta i timeout (NON raccomandato in produzione):
-http.open_timeout = 30  # invece di 10
-http.read_timeout = 30  # invece di 10
+# Increase timeouts (NOT recommended in production):
+http.open_timeout = 30  # instead of 10
+http.read_timeout = 30  # instead of 10
 ```
 
-## Riferimenti Utili
+## Useful References
 
-### Validatori Online
-- https://aykevl.nl/apps/mta-sts/ - Validator MTA-STS completo
-- https://mxtoolbox.com/SuperTool.aspx - Tool DNS generico
+### Online Validators
+- https://aykevl.nl/apps/mta-sts/ - Complete MTA-STS Validator
+- https://mxtoolbox.com/SuperTool.aspx - Generic DNS Tool
 
-### Comandi Utili
+### Useful Commands
 ```bash
-# Verifica record DNS TXT
+# Verify DNS TXT record
 dig TXT _mta-sts.example.com
 
-# Verifica record A/CNAME
+# Verify A/CNAME record
 dig mta-sts.example.com
 
-# Test HTTPS con dettagli SSL
+# Test HTTPS with SSL details
 curl -vvv https://mta-sts.example.com/.well-known/mta-sts.txt
 
-# Test da console Rails
+# Test from Rails console
 bundle exec rails console
 Domain.find_by(name: 'example.com').check_mta_sts_policy_file
 ```
-
