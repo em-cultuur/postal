@@ -272,6 +272,16 @@ module Postal
         default false
       end
 
+      integer :default_submission_port do
+        description "The port for SMTP submission (587) with mandatory STARTTLS. Opened automatically when TLS is enabled."
+        default 587
+      end
+
+      integer :default_tls_port do
+        description "The port for SMTPS (465) with implicit TLS. Opened automatically when TLS is enabled."
+        default 465
+      end
+
       string :tls_certificate_path do
         description "The path to the SMTP server's TLS certificate"
         default "$config-file-root/smtp.cert"

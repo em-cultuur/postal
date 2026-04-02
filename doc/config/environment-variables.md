@@ -55,6 +55,8 @@ This document contains all the environment variables which are available for thi
 | `SMTP_SERVER_TLS_PRIVATE_KEY_PATH` | String | The path to the SMTP server's TLS private key | $config-file-root/smtp.key |
 | `SMTP_SERVER_TLS_CIPHERS` | String | Override ciphers to use for SSL |  |
 | `SMTP_SERVER_SSL_VERSION` | String | The SSL versions which are supported | SSLv23 |
+| `SMTP_SERVER_DEFAULT_SUBMISSION_PORT` | Integer | The port for SMTP submission (587) with mandatory STARTTLS. Opened automatically when TLS is enabled. | 587 |
+| `SMTP_SERVER_DEFAULT_TLS_PORT` | Integer | The port for SMTPS (465) with implicit TLS. Opened automatically when TLS is enabled. | 465 |
 | `SMTP_SERVER_PROXY_PROTOCOL` | Boolean | Enable proxy protocol for use behind some load balancers (supports proxy protocol v1 only) | false |
 | `SMTP_SERVER_LOG_CONNECTIONS` | Boolean | Enable connection logging | false |
 | `SMTP_SERVER_MAX_MESSAGE_SIZE` | Integer | The maximum message size to accept from the SMTP server (in MB) | 14 |

@@ -44,7 +44,7 @@ module SMTPServer
       context "when username or password is missing" do
         it "returns an error and resets the state" do
           base64 = Base64.encode64("pass")
-          expect(client.handle("AUTH PLAIN #{base64}")).to eq("535 Authenticated failed - protocol error")
+          expect(client.handle("AUTH PLAIN #{base64}")).to eq("535 Authentication failed - protocol error")
           expect(client.state).to eq :welcomed
         end
       end
@@ -98,6 +98,78 @@ module SMTPServer
           expect(client.handle("AUTH LOGIN #{username}")).to eq("334 UGFzc3dvcmQ6")
           expect(client.handle(password)).to eq("535 Invalid credential")
           expect(client.state).to eq :welcomed
+        end
+      end
+    end
+
+    describe "port 25 regression" do
+      it "allows AUTH PLAIN without TLS" do
+        expect(client.handle("AUTH PLAIN")).to eq "334"
+      end
+
+      it "allows AUTH LOGIN without TLS" do
+        expect(client.handle("AUTH LOGIN")).to eq "334 VXNlcm5hbWU6"
+      end
+
+      it "allows AUTH CRAM-MD5 without TLS" do
+        expect(client.handle("AUTH CRAM-MD5")).to match(/\A334 [A-Za-z0-9=]+\z/)
+      end
+    end
+
+    describe "on port 465 (implicit TLS, no mandatory auth)" do
+      subject(:client) { described_class.new(ip_address, tls: true) }
+
+      before do
+        client.handle("HELO test.example.com")
+      end
+
+      it "allows AUTH PLAIN without prior STARTTLS" do
+        expect(client.handle("AUTH PLAIN")).to eq "334"
+      end
+
+      it "allows AUTH LOGIN without prior STARTTLS" do
+        expect(client.handle("AUTH LOGIN")).to eq "334 VXNlcm5hbWU6"
+      end
+
+      it "allows AUTH CRAM-MD5 without prior STARTTLS" do
+        expect(client.handle("AUTH CRAM-MD5")).to match(/\A334 [A-Za-z0-9=]+\z/)
+      end
+    end
+
+    describe "on submission port" do
+      subject(:client) { described_class.new(ip_address, submission: true) }
+
+      before do
+        client.handle("HELO test.example.com")
+      end
+
+      context "without TLS" do
+        it "rejects AUTH PLAIN" do
+          expect(client.handle("AUTH PLAIN")).to eq "530 5.7.0 Must issue a STARTTLS command first"
+        end
+
+        it "rejects AUTH LOGIN" do
+          expect(client.handle("AUTH LOGIN")).to eq "530 5.7.0 Must issue a STARTTLS command first"
+        end
+
+        it "rejects AUTH CRAM-MD5" do
+          expect(client.handle("AUTH CRAM-MD5")).to eq "530 5.7.0 Must issue a STARTTLS command first"
+        end
+      end
+
+      context "with TLS active" do
+        subject(:client) { described_class.new(ip_address, submission: true, tls: true) }
+
+        it "allows AUTH PLAIN" do
+          expect(client.handle("AUTH PLAIN")).to eq "334"
+        end
+
+        it "allows AUTH LOGIN" do
+          expect(client.handle("AUTH LOGIN")).to eq "334 VXNlcm5hbWU6"
+        end
+
+        it "allows AUTH CRAM-MD5" do
+          expect(client.handle("AUTH CRAM-MD5")).to match(/\A334 [A-Za-z0-9=]+\z/)
         end
       end
     end

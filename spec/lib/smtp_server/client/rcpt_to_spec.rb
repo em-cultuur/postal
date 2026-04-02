@@ -165,6 +165,84 @@ module SMTPServer
         end
       end
     end
+
+    describe "on submission port" do
+      subject(:client) { described_class.new(ip_address, submission: true, tls: true) }
+
+      before do
+        client.handle("HELO test.example.com")
+      end
+
+      context "when not authenticated" do
+        # Force state past MAIL FROM to test the RCPT TO auth check directly
+        # (MAIL FROM itself also rejects unauthenticated requests on submission ports)
+        before do
+          client.instance_variable_set(:@state, :mail_from_received)
+        end
+
+        it "requires authentication" do
+          expect(client.handle("RCPT TO: outgoing@example.com")).to eq "530 5.7.1 Authentication required"
+        end
+
+        it "blocks bounce recipients" do
+          server = create(:server)
+          address = "#{server.token}@#{Postal::Config.dns.return_path_domain}"
+          expect(client.handle("RCPT TO: #{address}")).to eq "530 5.7.1 Authentication required"
+        end
+
+        it "blocks route recipients" do
+          server = create(:server)
+          route = create(:route, server: server)
+          address = "#{route.name}@#{route.domain.name}"
+          expect(client.handle("RCPT TO: #{address}")).to eq "530 5.7.1 Authentication required"
+        end
+
+        it "blocks IP-based auth" do
+          server = create(:server)
+          create(:credential, server: server, type: "SMTP-IP", key: "1.0.0.0/8")
+          expect(client.handle("RCPT TO: outgoing@example.com")).to eq "530 5.7.1 Authentication required"
+        end
+      end
+
+      context "when authenticated" do
+        it "accepts outgoing mail with a valid credential" do
+          server = create(:server)
+          credential = create(:credential, server: server, type: "SMTP")
+          allow(Postal::Config.smtp_server).to receive(:tls_enabled?).and_return(true)
+          client.handle("AUTH PLAIN #{credential.to_smtp_plain}")
+          client.handle("MAIL FROM: test@example.com")
+          expect(client.handle("RCPT TO: outgoing@example.com")).to eq "250 OK"
+        end
+      end
+    end
+
+    describe "port 25 regression" do
+      it "allows bounce recipients without authentication" do
+        server = create(:server)
+        client.handle("HELO test.example.com")
+        client.handle("MAIL FROM: test@example.com")
+        address = "#{server.token}@#{Postal::Config.dns.return_path_domain}"
+        expect(client.handle("RCPT TO: #{address}")).to eq "250 OK"
+      end
+
+      it "allows route recipients without authentication" do
+        server = create(:server)
+        route = create(:route, server: server)
+        client.handle("HELO test.example.com")
+        client.handle("MAIL FROM: test@example.com")
+        address = "#{route.name}@#{route.domain.name}"
+        expect(client.handle("RCPT TO: #{address}")).to eq "250 OK"
+      end
+
+      it "allows IP-based auth" do
+        server = create(:server)
+        create(:credential, server: server, type: "SMTP-IP", key: "1.0.0.0/8")
+        client.handle("HELO test.example.com")
+        client.handle("MAIL FROM: test@example.com")
+        address = "test@example.com"
+        expect(client.handle("RCPT TO: #{address}")).to eq "250 OK"
+      end
+    end
   end
 
 end
