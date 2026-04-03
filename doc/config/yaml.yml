@@ -103,6 +103,10 @@ gelf:
 smtp_server:
   # The default port the SMTP server should listen on unless overriden by the PORT environment variable
   default_port: 25
+  # The port for SMTP submission (587) with mandatory STARTTLS. Opened automatically when TLS is enabled.
+  default_submission_port: 587
+  # The port for SMTPS (465) with implicit TLS. Opened automatically when TLS is enabled.
+  default_tls_port: 465
   # The default bind address the SMTP server should listen on unless overriden by the BIND_ADDRESS environment variable
   default_bind_address: ::
   # The default port for the SMTP server health server to listen on

@@ -73,19 +73,33 @@ module SMTPServer
       bind_address = ENV.fetch("BIND_ADDRESS", Postal::Config.smtp_server.default_bind_address)
       port = ENV.fetch("PORT", Postal::Config.smtp_server.default_port)
 
-      @server = TCPServer.open(bind_address, port)
-      @server.autoclose = false
-      @server.close_on_exec = false
+      @server = create_tcp_server(bind_address, port)
+      logger.info "Listening on #{bind_address}:#{port}"
+
+      return unless Postal::Config.smtp_server.tls_enabled?
+
+      submission_port = Postal::Config.smtp_server.default_submission_port
+      @submission_server = create_tcp_server(bind_address, submission_port)
+      logger.info "Listening on #{bind_address}:#{submission_port} (submission/STARTTLS)"
+
+      tls_port = Postal::Config.smtp_server.default_tls_port
+      @tls_server = create_tcp_server(bind_address, tls_port)
+      logger.info "Listening on #{bind_address}:#{tls_port} (SMTPS/implicit TLS)"
+    end
+
+    def create_tcp_server(bind_address, port)
+      server = TCPServer.open(bind_address, port)
+      server.autoclose = false
+      server.close_on_exec = false
       if defined?(Socket::SOL_SOCKET) && defined?(Socket::SO_KEEPALIVE)
-        @server.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
+        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
       end
       if defined?(Socket::SOL_TCP) && defined?(Socket::TCP_KEEPIDLE) && defined?(Socket::TCP_KEEPINTVL) && defined?(Socket::TCP_KEEPCNT)
-        @server.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPIDLE, 50)
-        @server.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPINTVL, 10)
-        @server.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPCNT, 5)
+        server.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPIDLE, 50)
+        server.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPINTVL, 10)
+        server.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPCNT, 5)
       end
-
-      logger.info "Listening on #{bind_address}:#{port}"
+      server
     end
 
     def unlisten
@@ -99,6 +113,8 @@ module SMTPServer
       @io_selector = NIO::Selector.new
       # Register the SMTP listener
       @io_selector.register(@server, :r)
+      @io_selector.register(@submission_server, :r) if @submission_server
+      @io_selector.register(@tls_server, :r) if @tls_server
       # Create a hash to contain a buffer for each client.
       buffers = Hash.new { |h, k| h[k] = String.new.force_encoding("BINARY") }
       loop do
@@ -114,16 +130,34 @@ module SMTPServer
               increment_prometheus_counter :postal_smtp_server_connections_total
               # Get the client's IP address and strip `::ffff:` for consistency.
               client_ip_address = new_io.remote_address.ip_address.sub(/\A::ffff:/, "")
-              if Postal::Config.smtp_server.proxy_protocol?
+              # Determine whether this connection is on the submission port (587)
+              is_submission = (io == @submission_server)
+              if io == @tls_server
+                # Port 465 (SMTPS): wrap the socket in TLS immediately and perform
+                # the handshake asynchronously. The welcome banner is sent only after
+                # the handshake completes (via pending_welcome).
+                new_io = OpenSSL::SSL::SSLSocket.new(new_io, ssl_context)
+                new_io.sync_close = true
+                if Postal::Config.smtp_server.proxy_protocol?
+                  client = Client.new(nil, tls: true)
+                else
+                  client = Client.new(client_ip_address, tls: true)
+                end
+                client.pending_welcome = true
+                client.start_tls = true
+                if Postal::Config.smtp_server.log_connections?
+                  client.logger&.debug "Connection opened from #{client_ip_address} (SMTPS)"
+                end
+              elsif Postal::Config.smtp_server.proxy_protocol?
                 # If we are using the haproxy proxy protocol, we will be sent the
                 # client's IP later. Delay the welcome process.
-                client = Client.new(nil)
+                client = Client.new(nil, submission: is_submission)
                 if Postal::Config.smtp_server.log_connections?
                   client.logger&.debug "Connection opened from #{client_ip_address}"
                 end
               else
                 # We're not using the proxy protocol so we already know the client's IP
-                client = Client.new(client_ip_address)
+                client = Client.new(client_ip_address, submission: is_submission)
                 if Postal::Config.smtp_server.log_connections?
                   client.logger&.debug "Connection opened from #{client_ip_address}"
                 end
@@ -172,6 +206,13 @@ module SMTPServer
                   increment_prometheus_counter :postal_smtp_server_tls_connections_total
                   # We were able to accept the connection, the client is no longer handshaking
                   client.start_tls = false
+                  # For implicit TLS connections (port 465), send the welcome banner now
+                  # that the TLS handshake is complete
+                  if client.pending_welcome
+                    io.write("220 #{Postal::Config.postal.smtp_hostname} ESMTP Postal/#{client.trace_id}\r\n")
+                    io.flush
+                    client.pending_welcome = false
+                  end
                 rescue IO::WaitReadable, IO::WaitWritable => e
                   # Could not accept without blocking
                   # We will try again later
@@ -286,6 +327,14 @@ module SMTPServer
 
         @io_selector.deregister(@server)
         @server.close
+        if @submission_server
+          @io_selector.deregister(@submission_server)
+          @submission_server.close
+        end
+        if @tls_server
+          @io_selector.deregister(@tls_server)
+          @tls_server.close
+        end
         # If there's nothing left to do, shut down the process
         if @io_selector.empty?
           Process.exit(0)

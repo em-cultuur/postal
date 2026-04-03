@@ -16,10 +16,16 @@ module SMTPServer
     attr_reader :headers
     attr_reader :state
     attr_reader :helo_name
+    attr_reader :submission
+    attr_accessor :pending_welcome
 
-    def initialize(ip_address)
+    alias submission? submission
+
+    def initialize(ip_address, submission: false, tls: false)
       @logging_enabled = true
       @ip_address = ip_address
+      @submission = submission
+      @tls = tls
 
       @cr_present = false
       @previous_cr_present = nil
@@ -137,6 +143,11 @@ module SMTPServer
     end
 
     def starttls
+      if @tls
+        increment_error_count("tls-already-active")
+        return "503 TLS already active"
+      end
+
       if Postal::Config.smtp_server.tls_enabled?
         @start_tls = true
         @tls = true
@@ -144,7 +155,7 @@ module SMTPServer
         "220 Ready to start TLS"
       else
         increment_error_count("tls-unavailable")
-        "502 TLS not available"
+        "454 TLS not available"
       end
     end
 
@@ -180,6 +191,8 @@ module SMTPServer
     end
 
     def auth_plain(data)
+      return tls_required_for_submission unless tls_ready_for_submission?
+
       increment_command_count("AUTH PLAIN")
 
       handler = proc do |idata|
@@ -190,7 +203,7 @@ module SMTPServer
         password = parts[-1]
         unless username && password
           increment_error_count("missing-credentials")
-          next "535 Authenticated failed - protocol error"
+          next "535 Authentication failed - protocol error"
         end
 
         authenticate(password)
@@ -207,6 +220,8 @@ module SMTPServer
     end
 
     def auth_login(data)
+      return tls_required_for_submission unless tls_ready_for_submission?
+
       increment_command_count("AUTH LOGIN")
 
       password_handler = proc do |idata|
@@ -242,6 +257,8 @@ module SMTPServer
     end
 
     def auth_cram_md5(data)
+      return tls_required_for_submission unless tls_ready_for_submission?
+
       increment_command_count("AUTH CRAM-MD5")
 
       challenge = Digest::SHA1.hexdigest(Time.now.to_i.to_s + rand(100_000).to_s)
@@ -284,6 +301,9 @@ module SMTPServer
     end
 
     def mail_from(data)
+      return tls_required_for_submission unless tls_ready_for_submission?
+      return authentication_required_for_submission unless authenticated_for_submission?
+
       unless in_state(:welcomed, :mail_from_received)
         increment_error_count("mail-from-out-of-order")
         return "503 EHLO/HELO first please"
@@ -307,6 +327,8 @@ module SMTPServer
         increment_error_count("rcpt-to-out-of-order")
         return "503 EHLO/HELO and MAIL FROM first please"
       end
+
+      return authentication_required_for_submission unless authenticated_for_submission?
 
       rcpt_to = data.gsub(/RCPT TO\s*:\s*/i, "").gsub(/.*</, "").gsub(/>.*/, "").strip
 
@@ -545,6 +567,24 @@ module SMTPServer
 
     def in_state(*states)
       states.include?(@state)
+    end
+
+    def tls_ready_for_submission?
+      !@submission || @tls
+    end
+
+    def tls_required_for_submission
+      increment_error_count("tls-required-for-submission")
+      "530 5.7.0 Must issue a STARTTLS command first"
+    end
+
+    def authenticated_for_submission?
+      !@submission || @credential
+    end
+
+    def authentication_required_for_submission
+      increment_error_count("authentication-required-for-submission")
+      "530 5.7.1 Authentication required"
     end
 
     def sanitize_input_for_log(data)
