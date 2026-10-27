@@ -2,6 +2,13 @@
 
 This file contains all the latest changes and updates to Postal.
 
+## [3.3.8-em](https://github.com/em-cultuur/postal/compare/3.3.7-em...3.3.8-em) (2026-10-27)
+
+
+### Documentation
+
+* document fork versioning and upstream sync workflow ([dcfd674](https://github.com/em-cultuur/postal/commit/dcfd674ba2bb9e09e6cb80d594ed47617c98a868))
+
 ## [3.3.7-em](https://github.com/em-cultuur/postal/compare/v3.3.7...3.3.7-em) (2026-10-27)
 
 
